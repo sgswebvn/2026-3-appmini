@@ -238,6 +238,24 @@ const App = {
   },
 
   // Export handlers
+  exportMisa() {
+    if (this.invoices.length === 0) {
+      UIController.showToast('Chưa có hóa đơn nào để xuất file!', 'error');
+      return;
+    }
+    ExcelExportService.exportMisaFormat(this.invoices);
+    UIController.showToast('Đã xuất file Excel mẫu MISA SME/AMIS thành công!', 'success');
+  },
+
+  exportHtkk() {
+    if (this.invoices.length === 0) {
+      UIController.showToast('Chưa có hóa đơn nào để xuất file!', 'error');
+      return;
+    }
+    ExcelExportService.exportHtkkFormat(this.invoices);
+    UIController.showToast('Đã xuất Bảng kê Thuế Mẫu 01-2/GTGT thành công!', 'success');
+  },
+
   exportExcel() {
     if (this.invoices.length === 0) {
       UIController.showToast('Chưa có hóa đơn nào để xuất file!', 'error');
