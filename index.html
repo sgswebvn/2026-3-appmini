@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BillFlow AI - Trình bóc tách hóa đơn & chứng từ thông minh sang Excel / Google Sheets</title>
+  <meta name="description" content="Tự động bóc tách hóa đơn VAT điện tử, bill chuyển khoản, phiếu thu chi bằng AI Vision sang Excel (.xlsx) 2-sheet chuẩn mẫu kế toán và Google Sheets trong 2 giây.">
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- SheetJS for Full Excel .xlsx Generation -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Chart.js for Expense Analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+  <!-- Top Sticky Header -->
+  <header class="app-header">
+    <div class="app-container" style="padding-top: 0; padding-bottom: 0; width: 100%; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+      
+      <div class="brand-wrapper">
+        <div class="brand-icon">
+          <i data-lucide="scan-text" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="brand-info">
+          <h1>
+            BillFlow AI 
+            <span class="brand-badge">Micro-SaaS 2.0</span>
+          </h1>
+          <p class="brand-subtitle">Trình bóc tách hóa đơn VAT & chứng từ sang Excel / Google Sheets</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div id="aiStatusPill" class="sample-pill" style="cursor: pointer;" onclick="App.openModal('apiSettingsModal')">
+          <span class="status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span>
+          <span id="aiStatusText">Chưa nhập API Key</span>
+        </div>
+
+        <button class="btn btn-secondary btn-sm" onclick="App.loadSampleData(true)" title="Nạp 4 hóa đơn mẫu">
+          <i data-lucide="sparkles" style="width: 15px; height: 15px; color: var(--primary);"></i> Nạp dữ liệu mẫu
+        </button>
+
+        <button class="btn btn-secondary btn-sm" onclick="App.openModal('analyticsModal')" title="Xem biểu đồ chi phí">
+          <i data-lucide="pie-chart" style="width: 15px; height: 15px; color: #a855f7;"></i> Phân tích chi phí
+        </button>
+
+        <button class="btn btn-secondary btn-sm" onclick="App.openModal('apiSettingsModal')" title="Cài đặt Gemini API Key">
+          <i data-lucide="key" style="width: 15px; height: 15px; color: #3b82f6;"></i> Cài đặt AI Key
+        </button>
+
+        <button class="btn btn-primary btn-sm" onclick="App.openModal('pricingModal')">
+          <i data-lucide="zap" style="width: 15px; height: 15px;"></i> Nâng cấp gói
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+
+    <!-- Quota & Tier Indicator Bar -->
+    <section class="quota-banner">
+      <div class="quota-info">
+        <span class="quota-badge">Gói Miễn Phí (Starter)</span>
+        <span style="font-size: 0.85rem; color: var(--text-secondary);">Bóc tách bằng Multimodal Vision AI tốc độ cao</span>
+      </div>
+      <div class="quota-bar-wrapper">
+        <span id="quotaText" style="font-size: 0.8rem; font-weight: 600; color: var(--text-main);">4/20 Hóa đơn miễn phí</span>
+        <div class="quota-progress">
+          <div id="quotaFill" class="quota-fill" style="width: 20%;"></div>
+        </div>
+        <button class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" onclick="App.openModal('pricingModal')">
+          Không giới hạn
+        </button>
+      </div>
+    </section>
+
+    <!-- Top Stats Ribbon -->
+    <section class="stats-ribbon">
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Tổng số chứng từ</div>
+          <div id="statTotalCount" class="stat-value">0</div>
+          <div class="stat-subtext">Hóa đơn điện tử & Bill</div>
+        </div>
+        <div class="stat-icon emerald">
+          <i data-lucide="receipt" style="width: 22px; height: 22px;"></i>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Tổng tiền chi phí (VND)</div>
+          <div id="statTotalSpending" class="stat-value">0 đ</div>
+          <div class="stat-subtext">Đã bao gồm thuế GTGT</div>
+        </div>
+        <div class="stat-icon blue">
+          <i data-lucide="wallet" style="width: 22px; height: 22px;"></i>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Thuế VAT được khấu trừ</div>
+          <div id="statTotalVat" class="stat-value">0 đ</div>
+          <div class="stat-subtext">Kê khai thuế đầu vào</div>
+        </div>
+        <div class="stat-icon purple">
+          <i data-lucide="percent" style="width: 22px; height: 22px;"></i>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Cảnh báo sai lệch số học</div>
+          <div id="statWarningCount" class="stat-value">0</div>
+          <div class="stat-subtext" style="color: var(--warning);">Cần rà soát lại</div>
+        </div>
+        <div class="stat-icon amber">
+          <i data-lucide="shield-alert" style="width: 22px; height: 22px;"></i>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Workspace Layout -->
+    <div class="workspace-layout">
+
+      <!-- 1. BATCH UPLOAD & DROPZONE -->
+      <section class="upload-card">
+        <input type="file" id="fileInput" multiple accept="image/*,application/pdf" style="display: none;">
+        
+        <div class="dropzone-area" id="dropzoneArea">
+          <div class="dropzone-icon-circle">
+            <i data-lucide="cloud-upload" style="width: 28px; height: 28px;"></i>
+          </div>
+          <h2 class="dropzone-title">Kéo & thả ảnh hóa đơn VAT, PDF hoặc bill thanh toán vào đây</h2>
+          <p class="dropzone-subtitle">
+            Hỗ trợ hóa đơn GTGT điện tử, hóa đơn giấy chụp qua điện thoại, vé xe, bill ZaloPay/Momo, ủy nhiệm chi ngân hàng...
+          </p>
+
+          <div class="dropzone-actions">
+            <button class="btn btn-primary" type="button">
+              <i data-lucide="upload" style="width: 16px; height: 16px;"></i> Chọn file từ máy tính
+            </button>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">hoặc dùng thử nhanh:</span>
+          </div>
+
+          <!-- Sample Invoices Pills -->
+          <div class="sample-pills-container" onclick="event.stopPropagation()">
+            <span class="sample-label">Thử ngay mẫu:</span>
+            <button type="button" class="sample-pill" onclick="App.loadSampleData(true)">
+              <i data-lucide="monitor" style="width: 12px; height: 12px; color: #3b82f6;"></i> Thiết bị Phong Vũ (10%)
+            </button>
+            <button type="button" class="sample-pill" onclick="App.loadSampleData(true)">
+              <i data-lucide="globe" style="width: 12px; height: 12px; color: #ea580c;"></i> Internet FPT Telecom
+            </button>
+            <button type="button" class="sample-pill" onclick="App.loadSampleData(true)">
+              <i data-lucide="fuel" style="width: 12px; height: 12px; color: #10b981;"></i> Xăng dầu Petrolimex (8%)
+            </button>
+            <button type="button" class="sample-pill" onclick="App.loadSampleData(true)">
+              <i data-lucide="utensils" style="width: 12px; height: 12px; color: #ef4444;"></i> Tiếp khách Golden Gate
+            </button>
+          </div>
+        </div>
+
+        <!-- File Queue Section -->
+        <div class="file-queue-section" id="fileQueueSection" style="display: none;">
+          <div class="queue-header">
+            <div class="queue-title">
+              <i data-lucide="layers" style="width: 16px; height: 16px; color: var(--primary);"></i>
+              Tiến trình xử lý hàng loạt
+            </div>
+            <span id="queueCountBadge" style="font-size: 0.75rem; color: var(--text-muted);">0 chứng từ</span>
+          </div>
+          <div class="queue-items-grid" id="queueItemsGrid"></div>
+        </div>
+      </section>
+
+      <!-- 2. SPLIT-SCREEN DOCUMENT REVIEWER (SIDE-BY-SIDE) -->
+      <section class="reviewer-card" id="reviewerCard">
+        <div class="reviewer-header">
+          <div class="reviewer-title">
+            <div style="width: 32px; height: 32px; border-radius: var(--radius-sm); background: rgba(16, 185, 129, 0.2); display: flex; align-items: center; justify-content: center; color: var(--primary);">
+              <i data-lucide="split" style="width: 18px; height: 18px;"></i>
+            </div>
+            <div>
+              <h3 style="font-size: 1rem; font-weight: 700;">Trình đối soát & Chỉnh sửa chứng từ (Split-Screen)</h3>
+              <p style="font-size: 0.75rem; color: var(--text-muted);">So sánh trực quan ảnh gốc bên trái và dữ liệu AI bóc tách bên phải</p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <button class="btn btn-secondary btn-sm" onclick="UIController.toggleReviewerFullscreen()" title="Bật/Tắt chế độ Toàn màn hình cực rộng">
+              <i data-lucide="maximize-2" id="fsIcon" style="width: 14px; height: 14px;"></i> <span id="fsText">Mở rộng toàn màn hình</span>
+            </button>
+            <button class="btn btn-outline-primary btn-sm" onclick="App.rescanCurrentInvoice()" title="Quét lại ảnh này bằng Gemini AI">
+              <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Quét lại bằng AI
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="App.saveReviewerChanges()">
+              <i data-lucide="check" style="width: 14px; height: 14px;"></i> Lưu thay đổi (Ctrl + S)
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="UIController.closeReviewer()">
+              <i data-lucide="x" style="width: 14px; height: 14px;"></i> Đóng
+            </button>
+          </div>
+        </div>
+
+        <div class="reviewer-split-container">
+          
+          <!-- Left Pane: Interactive Document Image Viewport -->
+          <div class="doc-viewport-pane">
+            <div class="doc-toolbar">
+              <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">
+                <i data-lucide="file-image" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> Chứng từ gốc
+              </div>
+              <div class="doc-zoom-controls">
+                <button class="btn btn-secondary btn-sm btn-icon-only" onclick="UIController.zoomDoc(-0.15)" title="Thu nhỏ">
+                  <i data-lucide="zoom-out" style="width: 14px; height: 14px;"></i>
+                </button>
+                <span id="zoomPercentage" style="font-size: 0.75rem; font-family: var(--font-mono); min-width: 42px; text-align: center;">100%</span>
+                <button class="btn btn-secondary btn-sm btn-icon-only" onclick="UIController.zoomDoc(0.15)" title="Phóng to">
+                  <i data-lucide="zoom-in" style="width: 14px; height: 14px;"></i>
+                </button>
+                <button class="btn btn-secondary btn-sm btn-icon-only" onclick="UIController.rotateDoc()" title="Xoay 90 độ">
+                  <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
+                </button>
+                <button class="btn btn-secondary btn-sm btn-icon-only" onclick="UIController.resetDocTransform()" title="Mặc định">
+                  <i data-lucide="maximize" style="width: 14px; height: 14px;"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="doc-canvas-area" id="docCanvasArea" style="cursor: grab;">
+              <img id="docImagePreview" class="doc-image-preview" src="" alt="Bản xem trước hóa đơn">
+            </div>
+          </div>
+
+          <!-- Right Pane: Structured Fields & Line Items Table -->
+          <div class="doc-data-pane">
+            
+            <!-- Live Math Discrepancy Banner -->
+            <div id="revMathAlert" class="math-validation-box valid">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="shield-check" style="width: 18px; height: 18px;"></i>
+                <span>Số liệu khớp 100%</span>
+              </div>
+            </div>
+
+            <!-- General Invoice Meta -->
+            <div>
+              <div class="data-section-title">
+                <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> 1. Thông tin hóa đơn
+              </div>
+              <div class="form-grid-3">
+                <div class="form-group">
+                  <label class="form-label">Số hóa đơn</label>
+                  <input type="text" id="revInvoiceNo" class="form-input font-mono" placeholder="0012345">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Ký hiệu mẫu số</label>
+                  <input type="text" id="revSymbol" class="form-input font-mono" placeholder="1C24TLL">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Ngày lập HĐ</label>
+                  <input type="date" id="revDate" class="form-input font-mono">
+                </div>
+              </div>
+
+              <div class="form-grid-3" style="margin-top: 0.75rem;">
+                <div class="form-group">
+                  <label class="form-label">Loại chứng từ</label>
+                  <input type="text" id="revTitle" class="form-input" placeholder="Hóa đơn GTGT...">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Phân loại chi phí</label>
+                  <select id="revCategory" class="form-input">
+                    <option value="Chi phí văn phòng">Chi phí văn phòng</option>
+                    <option value="Chi phí viễn thông / Internet">Chi phí viễn thông / Internet</option>
+                    <option value="Chi phí đi lại / Vận chuyển">Chi phí đi lại / Vận chuyển</option>
+                    <option value="Chi phí tiếp khách / Ăn uống">Chi phí tiếp khách / Ăn uống</option>
+                    <option value="Chi phí Marketing / Quảng cáo">Chi phí Marketing / Quảng cáo</option>
+                    <option value="Chi phí phần mềm / IT">Chi phí phần mềm / IT</option>
+                    <option value="Chi phí quản lý chung">Chi phí quản lý chung</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Hình thức thanh toán</label>
+                  <input type="text" id="revPaymentMethod" class="form-input" placeholder="Chuyển khoản / Tiền mặt">
+                </div>
+              </div>
+            </div>
+
+            <!-- Vendor Info -->
+            <div>
+              <div class="data-section-title">
+                <i data-lucide="building-2" style="width: 14px; height: 14px;"></i> 2. Đơn vị bán / Nhà cung cấp
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">Tên nhà cung cấp</label>
+                  <input type="text" id="revVendorName" class="form-input" placeholder="Công ty CP...">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Mã số thuế bên bán</label>
+                  <input type="text" id="revVendorTaxCode" class="form-input font-mono" placeholder="0101234567">
+                </div>
+              </div>
+              <div class="form-group" style="margin-top: 0.75rem;">
+                <label class="form-label">Địa chỉ người bán</label>
+                <input type="text" id="revVendorAddress" class="form-input" placeholder="Địa chỉ...">
+              </div>
+            </div>
+
+            <!-- Buyer Info -->
+            <div>
+              <div class="data-section-title">
+                <i data-lucide="user-check" style="width: 14px; height: 14px;"></i> 3. Đơn vị mua hàng
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">Tên công ty / Người mua</label>
+                  <input type="text" id="revBuyerName" class="form-input" placeholder="Tên bên mua...">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Mã số thuế bên mua</label>
+                  <input type="text" id="revBuyerTaxCode" class="form-input font-mono" placeholder="MST bên mua...">
+                </div>
+              </div>
+            </div>
+
+            <!-- Line Items Table -->
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                <div class="data-section-title" style="margin-bottom: 0;">
+                  <i data-lucide="list" style="width: 14px; height: 14px;"></i> 4. Chi tiết từng dòng hàng hóa / dịch vụ
+                  <span id="revItemCountBadge" style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.2); color: var(--primary); padding: 0.15rem 0.5rem; border-radius: 999px; margin-left: 0.35rem;">0 món</span>
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="UIController.addLineItem()">
+                  <i data-lucide="plus" style="width: 12px; height: 12px;"></i> Thêm dòng
+                </button>
+              </div>
+
+              <div class="line-items-wrapper">
+                <table class="mini-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 35px; text-align: center;">STT</th>
+                      <th style="min-width: 200px;">Tên hàng hóa, dịch vụ</th>
+                      <th style="width: 75px; text-align: center;">ĐVT</th>
+                      <th style="width: 65px; text-align: right;">SL</th>
+                      <th style="width: 120px; text-align: right;">Đơn giá</th>
+                      <th style="width: 130px; text-align: right;">Thành tiền</th>
+                      <th style="width: 35px; text-align: center;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="revItemsTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Total Breakdown -->
+            <div>
+              <div class="data-section-title">
+                <i data-lucide="calculator" style="width: 14px; height: 14px;"></i> 5. Tổng tiền thanh toán & Thuế GTGT
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label">Cộng tiền hàng (Chưa VAT)</label>
+                  <input type="number" id="revSubtotal" class="form-input font-mono" oninput="UIController.recalculateTaxAndTotal()">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Thuế suất VAT (%)</label>
+                  <select id="revVatRate" class="form-input font-mono" onchange="UIController.recalculateTaxAndTotal()">
+                    <option value="10">10%</option>
+                    <option value="8">8% (Giảm thuế)</option>
+                    <option value="5">5%</option>
+                    <option value="0">0% (Không chịu thuế / Xuất khẩu)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-grid-2" style="margin-top: 0.75rem;">
+                <div class="form-group">
+                  <label class="form-label">Tiền thuế GTGT (VND)</label>
+                  <input type="number" id="revVatAmount" class="form-input font-mono" oninput="UIController.checkMathInReviewer()">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="color: var(--primary); font-weight: 700;">TỔNG THANH TOÁN (VND)</label>
+                  <input type="number" id="revTotal" class="form-input font-mono" style="font-weight: 800; font-size: 1rem; color: var(--primary);" oninput="UIController.checkMathInReviewer()">
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 3. BATCH DATA GRID (SPREADSHEET VIEW) -->
+      <section class="grid-section-card">
+        
+        <!-- Grid Toolbar -->
+        <div class="grid-toolbar">
+          <div class="grid-search-filter">
+            <div class="search-input-wrapper">
+              <i data-lucide="search" class="search-icon" style="width: 16px; height: 16px;"></i>
+              <input type="text" id="searchInput" placeholder="Tìm theo Số HĐ, Tên nhà cung cấp, MST...">
+            </div>
+            
+            <select id="categoryFilter" class="form-input" style="width: 180px;">
+              <option value="all">Tất cả chi phí</option>
+              <option value="Chi phí văn phòng">Chi phí văn phòng</option>
+              <option value="Chi phí viễn thông / Internet">Viễn thông / Internet</option>
+              <option value="Chi phí đi lại / Vận chuyển">Đi lại / Vận chuyển</option>
+              <option value="Chi phí tiếp khách / Ăn uống">Tiếp khách / Ăn uống</option>
+              <option value="Chi phí Marketing / Quảng cáo">Marketing / Quảng cáo</option>
+              <option value="Chi phí phần mềm / IT">Phần mềm / IT</option>
+            </select>
+          </div>
+
+          <div class="grid-actions">
+            <!-- Master All Items Table View -->
+            <button class="btn btn-secondary" onclick="App.openModal('allItemsModal')" title="Xem bảng kê chi tiết toàn bộ từng món hàng của tất cả hóa đơn">
+              <i data-lucide="boxes" style="width: 16px; height: 16px; color: #a855f7;"></i> Chi tiết tất cả hàng hóa
+            </button>
+
+            <!-- 1-Click Export Excel -->
+            <button class="btn btn-primary" onclick="App.exportExcel()" title="Xuất file Excel 2 sheet chuẩn thuế">
+              <i data-lucide="file-spreadsheet" style="width: 16px; height: 16px;"></i> Xuất Excel (.xlsx)
+            </button>
+
+            <!-- 1-Click Copy Google Sheets -->
+            <button class="btn btn-secondary" onclick="App.copyForGoogleSheets()" title="Copy nhanh để dán Ctrl+V vào Google Sheets">
+              <i data-lucide="clipboard-copy" style="width: 16px; height: 16px; color: #10b981;"></i> Dán Google Sheets
+            </button>
+
+            <!-- Dropdown Other Formats -->
+            <button class="btn btn-secondary" onclick="App.exportCsv()" title="Xuất file CSV">
+              <i data-lucide="download" style="width: 15px; height: 15px;"></i> CSV
+            </button>
+
+            <button class="btn btn-secondary" onclick="App.exportJson()" title="Xuất JSON API">
+              <i data-lucide="code" style="width: 15px; height: 15px;"></i> JSON
+            </button>
+
+            <button class="btn btn-secondary" style="color: #ef4444;" onclick="App.clearAllInvoices()" title="Dọn dẹp danh sách">
+              <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Spreadsheet Table -->
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 36px; text-align: center;">
+                  <input type="checkbox" id="selectAllCheckbox">
+                </th>
+                <th style="width: 45px;">STT</th>
+                <th>Số HĐ / Ngày</th>
+                <th>Đơn vị bán / MST</th>
+                <th>Phân loại chi phí</th>
+                <th style="text-align: right;">Tiền chưa thuế</th>
+                <th style="text-align: right;">Thuế VAT</th>
+                <th style="text-align: right;">Tổng thanh toán</th>
+                <th style="width: 150px; text-align: center;">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="invoiceTableBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Footer / Counter -->
+        <div class="grid-footer">
+          <span id="gridCountLabel">Hiển thị 4/4 hóa đơn</span>
+          <span style="display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="shield-check" style="width: 14px; height: 14px; color: var(--primary);"></i>
+            Tự động kiểm tra khớp số học công thức thuế GTGT
+          </span>
+        </div>
+
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================================================
+       MODALS
+       ======================================================================== -->
+
+  <!-- 1. Gemini API Settings Modal -->
+  <div class="modal-backdrop" id="apiSettingsModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="key" style="color: #3b82f6; width: 20px; height: 20px;"></i>
+          <h3 style="font-size: 1.1rem; font-weight: 700;">Cấu hình Gemini Multimodal Vision API</h3>
+        </div>
+        <button class="btn btn-secondary btn-sm btn-icon-only" onclick="App.closeModal('apiSettingsModal')">
+          <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Nhập Google Gemini API Key để kích hoạt bóc tách trực tiếp ảnh hóa đơn thực tế của bạn bằng AI Vision đa phương thức.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Google Gemini API Key</label>
+          <input type="password" id="apiKeyInput" class="form-input font-mono" placeholder="AIzaSy...">
+          <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">
+            Khóa API được lưu an toàn tại <code>localStorage</code> trên trình duyệt của bạn và không bao giờ gửi về máy chủ trung gian.
+          </span>
+        </div>
+
+        <div style="margin-top: 1.25rem; padding: 0.875rem; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-md); font-size: 0.8rem;">
+          <div style="font-weight: 700; color: #60a5fa; margin-bottom: 0.25rem;">Chưa có API Key?</div>
+          <div>Bạn có thể lấy miễn phí tại <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #93c5fd; text-decoration: underline; font-weight: 600;">Google AI Studio</a> trong 30 giây. Nếu không nhập, webapp sẽ dùng Smart Heuristic Engine để mô phỏng hoàn chỉnh.</div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeModal('apiSettingsModal')">Hủy</button>
+        <button class="btn btn-primary" onclick="App.saveGeminiApiKey()">Lưu cấu hình</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Analytics & Visual Charts Modal -->
+  <div class="modal-backdrop" id="analyticsModal">
+    <div class="modal-container max-w-4xl">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="pie-chart" style="color: #a855f7; width: 20px; height: 20px;"></i>
+          <h3 style="font-size: 1.1rem; font-weight: 700;">Báo cáo phân tích chi phí & Thuế đầu vào</h3>
+        </div>
+        <button class="btn btn-secondary btn-sm btn-icon-only" onclick="App.closeModal('analyticsModal')">
+          <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.5rem;">
+          
+          <div style="background: rgba(15, 23, 42, 0.6); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle);">
+            <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-secondary); text-align: center;">
+              Cơ cấu chi phí theo danh mục
+            </h4>
+            <div style="max-height: 260px; display: flex; align-items: center; justify-content: center;">
+              <canvas id="categoryChartCanvas"></canvas>
+            </div>
+          </div>
+
+          <div style="background: rgba(15, 23, 42, 0.6); padding: 1.25rem; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle);">
+            <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-secondary);">
+              Top 5 Nhà cung cấp chi tiêu nhiều nhất
+            </h4>
+            <div style="max-height: 260px;">
+              <canvas id="vendorChartCanvas"></canvas>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="App.closeModal('analyticsModal')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Pricing & Upgrade Modal -->
+  <div class="modal-backdrop" id="pricingModal">
+    <div class="modal-container max-w-4xl">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="zap" style="color: var(--primary); width: 20px; height: 20px;"></i>
+          <h3 style="font-size: 1.1rem; font-weight: 700;">Nâng cấp gói BillFlow Pro (Micro-SaaS)</h3>
+        </div>
+        <button class="btn btn-secondary btn-sm btn-icon-only" onclick="App.closeModal('pricingModal')">
+          <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p style="text-align: center; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+          Giải phóng 90% thời gian nhập liệu hóa đơn của bạn với chi phí chỉ bằng 1 ly cafe mỗi tuần.
+        </p>
+
+        <div class="pricing-grid">
+          
+          <!-- Starter -->
+          <div class="pricing-card">
+            <h4 style="font-size: 1rem; font-weight: 700;">Gói Miễn Phí</h4>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Dành cho cá nhân trải nghiệm</div>
+            <div class="pricing-price">0 đ <span style="font-size: 0.8rem; font-weight: 400; color: var(--text-muted);">/ mãi mãi</span></div>
+            <ul class="pricing-features">
+              <li><i data-lucide="check" style="width: 14px; height: 14px; color: var(--primary);"></i> 20 hóa đơn / tháng</li>
+              <li><i data-lucide="check" style="width: 14px; height: 14px; color: var(--primary);"></i> Xuất file Excel (.xlsx) 2-sheet</li>
+              <li><i data-lucide="check" style="width: 14px; height: 14px; color: var(--primary);"></i> Copy dán vào Google Sheets</li>
+            </ul>
+            <button class="btn btn-secondary btn-sm" style="margin-top: auto;" disabled>Đang sử dụng</button>
+          </div>
+
+          <!-- Pro (Featured) -->
+          <div class="pricing-card featured">
+            <span class="pricing-badge-popular">Phổ biến nhất</span>
+            <h4 style="font-size: 1.1rem; font-weight: 800; color: var(--primary);">Gói Pro Kế Toán</h4>
+            <div style="font-size: 0.8rem; color: var(--text-secondary);">Dành cho kế toán tự do, shop, agency</div>
+            <div class="pricing-price">199.000 đ <span style="font-size: 0.8rem; font-weight: 400; color: var(--text-muted);">/ tháng</span></div>
+            <ul class="pricing-features">
+              <li><i data-lucide="check" style="width: 14px; height: 14px; color: var(--primary);"></i> <strong>500 hóa đơn & bill / tháng</strong></li>
+              <li><i data-lucide="check" style="width: 14px; height: 14px; color: var(--primary);"></i> Bóc tách song song không giới hạn</li>
+              <li><i data-lucide="check" style="width: 14px; height: 14px; color: var(--primary);"></i> Tự động kiểm tra MST và công thức VAT</li>
+              <li><i data-lucide="check" style="width: 14px; height: 14px; color: var(--primary);"></i> Trình đối soát Split-screen siêu mượt</li>
+            </ul>
+            <button class="btn btn-primary" style="margin-top: auto;" onclick="UIController.showToast('Cảm ơn bạn! Tính năng cổng thanh toán VietQR Pro đang kết nối.', 'success')">
+              Nâng cấp ngay
+            </button>
+          </div>
+
+          <!-- Business -->
+          <div class="pricing-card">
+            <h4 style="font-size: 1rem; font-weight: 700;">Gói Doanh Nghiệp</h4>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Dành cho chuỗi cửa hàng & công ty</div>
+            <div class="pricing-price">499.000 đ <span style="font-size: 0.8rem; font-weight: 400; color: var(--text-muted);">/ tháng</span></div>
+            <ul class="pricing-features">
+              <li><i data-lucide="check" style="width: 14px; height: 14px; color: var(--primary);"></i> Không giới hạn số lượng chứng từ</li>
+              <li><i data-lucide="check" style="width: 14px; height: 14px; color: var(--primary);"></i> Tích hợp Webhook đẩy thẳng MISA/ERP</li>
+              <li><i data-lucide="check" style="width: 14px; height: 14px; color: var(--primary);"></i> Phân quyền nhiều nhân viên nhập liệu</li>
+            </ul>
+            <button class="btn btn-secondary btn-sm" style="margin-top: auto;" onclick="UIController.showToast('Vui lòng liên hệ bộ phận kinh doanh.', 'info')">
+              Liên hệ tư vấn
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeModal('pricingModal')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Master All Line Items Modal -->
+  <div class="modal-backdrop" id="allItemsModal">
+    <div class="modal-container max-w-4xl" style="max-width: 1100px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="boxes" style="color: #a855f7; width: 22px; height: 22px;"></i>
+          <div>
+            <h3 style="font-size: 1.1rem; font-weight: 700;">Bảng kê chi tiết tất cả sản phẩm / mặt hàng</h3>
+            <p style="font-size: 0.75rem; color: var(--text-muted);">Tổng hợp toàn bộ từng dòng hàng hóa của tất cả hóa đơn đã quét</p>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm btn-icon-only" onclick="App.closeModal('allItemsModal')">
+          <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" style="padding: 1.25rem;">
+        <div style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+          <div class="search-input-wrapper" style="flex: 1; max-width: 400px;">
+            <i data-lucide="search" class="search-icon" style="width: 14px; height: 14px;"></i>
+            <input type="text" id="itemSearchInput" placeholder="Tìm theo tên món hàng, số HĐ, NCC..." oninput="UIController.filterAllItemsModal()">
+          </div>
+          <div id="allItemsCountBadge" style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">
+            Tổng cộng: 0 mặt hàng
+          </div>
+        </div>
+
+        <div class="table-responsive" style="max-height: 480px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 40px; text-align: center;">STT</th>
+                <th style="width: 100px;">Số HĐ</th>
+                <th style="width: 100px;">Ngày</th>
+                <th>Nhà cung cấp</th>
+                <th>Tên hàng hóa, dịch vụ</th>
+                <th style="width: 60px; text-align: center;">ĐVT</th>
+                <th style="width: 60px; text-align: right;">SL</th>
+                <th style="width: 120px; text-align: right;">Đơn giá</th>
+                <th style="width: 130px; text-align: right;">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody id="allItemsMasterTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeModal('allItemsModal')">Đóng</button>
+        <button class="btn btn-primary" onclick="App.exportExcel()">
+          <i data-lucide="file-spreadsheet" style="width: 14px; height: 14px;"></i> Xuất Excel Sheet Chi Tiết
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Modules -->
+  <script src="js/sample-data.js"></script>
+  <script src="js/extractor.js"></script>
+  <script src="js/ai-service.js"></script>
+  <script src="js/excel-export.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
