@@ -61,6 +61,11 @@
           <i data-lucide="key" style="width: 15px; height: 15px; color: #3b82f6;"></i> Cài đặt AI Key
         </button>
 
+        <button id="headerPinStatusBtn" class="btn btn-secondary btn-sm" onclick="PinService.openPinModal()" title="Kiểm tra trạng thái Mã PIN / Dùng thử">
+          <span id="headerPinStatusDot" class="status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; display: inline-block;"></span>
+          <span id="headerPinStatusText">Mã PIN: 0/2 Lượt test</span>
+        </button>
+
         <button class="btn btn-primary btn-sm" onclick="App.openModal('pricingModal')">
           <i data-lucide="zap" style="width: 15px; height: 15px;"></i> Nâng cấp gói
         </button>
@@ -75,16 +80,16 @@
     <!-- Quota & Tier Indicator Bar -->
     <section class="quota-banner">
       <div class="quota-info">
-        <span class="quota-badge">Gói Miễn Phí (Starter)</span>
+        <span class="quota-badge">Gói Dùng Thử (2 Lượt Test)</span>
         <span style="font-size: 0.85rem; color: var(--text-secondary);">Bóc tách bằng Multimodal Vision AI tốc độ cao</span>
       </div>
       <div class="quota-bar-wrapper">
-        <span id="quotaText" style="font-size: 0.8rem; font-weight: 600; color: var(--text-main);">4/20 Hóa đơn miễn phí</span>
+        <span id="quotaText" style="font-size: 0.8rem; font-weight: 600; color: var(--text-main);">0/2 Lượt test miễn phí</span>
         <div class="quota-progress">
-          <div id="quotaFill" class="quota-fill" style="width: 20%;"></div>
+          <div id="quotaFill" class="quota-fill" style="width: 0%;"></div>
         </div>
-        <button class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" onclick="App.openModal('pricingModal')">
-          Không giới hạn
+        <button class="btn btn-primary btn-sm" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" onclick="PinService.openPinModal()">
+          <i data-lucide="key" style="width: 12px; height: 12px;"></i> Nhập Mã PIN
         </button>
       </div>
     </section>
@@ -173,6 +178,20 @@
             </button>
             <button type="button" class="sample-pill" onclick="App.loadSampleData(true)">
               <i data-lucide="utensils" style="width: 12px; height: 12px; color: #ef4444;"></i> Tiếp khách Golden Gate
+            </button>
+          </div>
+
+          <!-- Lock Overlay when 2 trials used and PIN not unlocked -->
+          <div class="dropzone-lock-overlay" id="dropzoneLockOverlay" style="display: none;" onclick="PinService.openPinModal(); event.stopPropagation();">
+            <div class="lock-icon-badge">
+              <i data-lucide="lock" style="width: 28px; height: 28px; color: #ef4444;"></i>
+            </div>
+            <h3 class="lock-title">Đã hết 2 lượt test miễn phí</h3>
+            <p class="lock-desc">
+              Bạn đã sử dụng hết hạn mức 2 lần thử nghiệm. Vui lòng nhập <strong>Mã PIN</strong> để mở khóa bóc tách hóa đơn không giới hạn.
+            </p>
+            <button class="btn btn-primary lock-action-btn" type="button" onclick="PinService.openPinModal(); event.stopPropagation();">
+              <i data-lucide="key" style="width: 16px; height: 16px;"></i> Nhập Mã PIN Mở Khóa
             </button>
           </div>
         </div>
@@ -725,7 +744,78 @@
     </div>
   </div>
 
+  <!-- 5. PIN Verification Modal -->
+  <div class="modal-backdrop" id="pinModal">
+    <div class="modal-container" style="max-width: 480px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(239, 68, 68, 0.15); display: flex; align-items: center; justify-content: center; color: #f87171;">
+            <i data-lucide="shield-alert" style="width: 18px; height: 18px;"></i>
+          </div>
+          <div>
+            <h3 style="font-size: 1.1rem; font-weight: 700;">Xác thực Mã PIN Kích Hoạt</h3>
+            <p style="font-size: 0.75rem; color: var(--text-muted);">Mở khóa toàn quyền bóc tách không giới hạn</p>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm btn-icon-only" onclick="PinService.closePinModal()">
+          <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div id="pinModalNotice" class="pin-notice-box">
+          🔒 <strong>Chỉ cho phép test 2 lần miễn phí.</strong><br>Vui lòng nhập mã PIN do Quản trị viên cung cấp để tiếp tục sử dụng.
+        </div>
+
+        <form id="pinForm" onsubmit="event.preventDefault(); PinService.submitPin();">
+          <div class="form-group" style="margin-top: 1.25rem;">
+            <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Nhập Mã PIN</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400;">(Không phân biệt hoa/thường)</span>
+            </label>
+            <div id="pinInputBoxWrapper" class="pin-input-wrapper">
+              <i data-lucide="key" style="width: 18px; height: 18px; color: var(--primary); margin-left: 0.75rem;"></i>
+              <input type="text" id="pinCodeInput" class="form-input pin-input" placeholder="Nhập mã PIN (VD: 888888)..." autocomplete="off" maxlength="20" autofocus>
+            </div>
+            <div id="pinErrorMessage" class="pin-error-text" style="display: none;"></div>
+          </div>
+
+          <div style="margin-top: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem;">
+            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 0.75rem; font-weight: 700; font-size: 0.95rem;">
+              <i data-lucide="unlock" style="width: 18px; height: 18px;"></i> Xác nhận & Mở Khóa
+            </button>
+          </div>
+        </form>
+
+        <div class="pin-demo-hint">
+          <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.35rem;">
+            <i data-lucide="info" style="width: 14px; height: 14px; color: #38bdf8;"></i> Mã PIN mặc định sẵn sàng kích hoạt:
+          </div>
+          <div class="pin-preset-tags">
+            <span class="pin-chip" onclick="document.getElementById('pinCodeInput').value='888888'; PinService.submitPin();">888888</span>
+            <span class="pin-chip" onclick="document.getElementById('pinCodeInput').value='999999'; PinService.submitPin();">999999</span>
+            <span class="pin-chip" onclick="document.getElementById('pinCodeInput').value='VIP2026'; PinService.submitPin();">VIP2026</span>
+            <span class="pin-chip" onclick="document.getElementById('pinCodeInput').value='686868'; PinService.submitPin();">686868</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 1rem; border-top: 1px dashed var(--border-subtle); padding-top: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Dành cho Admin:</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;" onclick="PinService.resetUsage(); PinService.lock(); if (window.UIController) UIController.showToast('Đã reset lại 0/2 lượt test & Khóa hệ thống!', 'info'); PinService.closePinModal(); App.refreshUI();">
+            <i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i> Reset 2 lượt test (Khóa lại)
+          </button>
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="padding: 0.75rem 1.25rem;">
+        <button class="btn btn-secondary btn-sm" onclick="PinService.closePinModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- JavaScript Modules -->
+  <script src="js/pin-service.js"></script>
   <script src="js/sample-data.js"></script>
   <script src="js/extractor.js"></script>
   <script src="js/ai-service.js"></script>

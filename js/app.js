@@ -9,6 +9,9 @@ const App = {
 
   // Initialize App
   init() {
+    if (window.PinService) {
+      PinService.init();
+    }
     this.loadState();
     this.bindEvents();
     
@@ -24,6 +27,10 @@ const App = {
     const keyInput = document.getElementById('apiKeyInput');
     if (keyInput && savedKey) keyInput.value = savedKey;
     this.updateAiStatusIndicator();
+
+    if (window.PinService) {
+      PinService.syncUI();
+    }
 
     if (window.lucide) lucide.createIcons();
     console.log('BillFlow AI initialized successfully.');
@@ -53,11 +60,20 @@ const App = {
 
   // Load Sample Invoices
   loadSampleData(notify = true) {
+    if (notify && window.PinService && !PinService.canPerformTest()) {
+      PinService.openPinModal('🔒 <strong>Bạn đã dùng hết 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để nạp thêm dữ liệu mẫu.');
+      return;
+    }
+
     const samples = SampleDataService.getSamples();
     this.invoices = [...samples];
     this.saveState();
     this.refreshUI();
+    
     if (notify) {
+      if (window.PinService) {
+        PinService.consumeTrial(1);
+      }
       UIController.showToast('Đã nạp 4 hóa đơn mẫu thực tế thành công!', 'success');
     }
   },
@@ -76,6 +92,11 @@ const App = {
   async processFiles(files) {
     if (!files || files.length === 0) return;
 
+    if (window.PinService && !PinService.canPerformTest()) {
+      PinService.openPinModal(`🔒 <strong>Bạn đã dùng hết 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để bóc tách ${files.length} hóa đơn.`);
+      return;
+    }
+
     const queueContainer = document.getElementById('fileQueueSection');
     const queueList = document.getElementById('queueItemsGrid');
     if (queueContainer) queueContainer.style.display = 'block';
@@ -83,6 +104,11 @@ const App = {
     UIController.showToast(`Bắt đầu xử lý hàng loạt ${files.length} hóa đơn...`, 'info');
 
     for (let i = 0; i < files.length; i++) {
+      if (window.PinService && !PinService.canPerformTest()) {
+        PinService.openPinModal('🔒 <strong>Đã đạt giới hạn 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để tiếp tục xử lý các hóa đơn còn lại.');
+        break;
+      }
+
       const file = files[i];
       const tempId = 'temp_' + Date.now() + '_' + i;
 
@@ -114,6 +140,12 @@ const App = {
         // Add to main invoices array at top
         this.invoices.unshift(extracted);
         this.saveState();
+
+        // Consume 1 trial test
+        if (window.PinService) {
+          PinService.consumeTrial(1);
+        }
+
         this.refreshUI();
 
         // Update queue item card to Done
@@ -304,7 +336,13 @@ const App = {
 
     // Drag & Drop
     if (dropzone && fileInput) {
-      dropzone.addEventListener('click', () => fileInput.click());
+      dropzone.addEventListener('click', (e) => {
+        if (window.PinService && !PinService.canPerformTest()) {
+          PinService.openPinModal('🔒 <strong>Bạn đã dùng hết 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để chọn file bóc tách.');
+          return;
+        }
+        fileInput.click();
+      });
       
       dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -318,6 +356,10 @@ const App = {
       dropzone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropzone.classList.remove('dragover');
+        if (window.PinService && !PinService.canPerformTest()) {
+          PinService.openPinModal('🔒 <strong>Bạn đã dùng hết 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để bóc tách hóa đơn.');
+          return;
+        }
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
           this.processFiles(e.dataTransfer.files);
         }
@@ -417,6 +459,11 @@ const App = {
 
   // Rescan active invoice in reviewer
   async rescanCurrentInvoice() {
+    if (window.PinService && !PinService.canPerformTest()) {
+      PinService.openPinModal('🔒 <strong>Bạn đã dùng hết 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để quét lại chứng từ.');
+      return;
+    }
+
     const id = UIController.activeInvoiceId;
     if (!id) return;
 
@@ -447,6 +494,10 @@ const App = {
       extracted.id = currentInv.id;
       extracted.previewUrl = currentInv.previewUrl;
       extracted.fileName = currentInv.fileName;
+
+      if (window.PinService) {
+        PinService.consumeTrial(1);
+      }
 
       this.invoices[invIndex] = extracted;
       this.saveState();

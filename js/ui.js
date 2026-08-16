@@ -66,14 +66,10 @@ const UIController = {
     document.getElementById('statTotalVat').innerText = ExtractorValidator.formatCurrency(totalVat);
     document.getElementById('statWarningCount').innerText = warningCount;
 
-    // Update Quota Bar
-    const quotaUsed = totalCount;
-    const quotaMax = 20;
-    const percentage = Math.min(100, Math.round((quotaUsed / quotaMax) * 100));
-    const quotaFill = document.getElementById('quotaFill');
-    const quotaText = document.getElementById('quotaText');
-    if (quotaFill) quotaFill.style.width = `${percentage}%`;
-    if (quotaText) quotaText.innerText = `${quotaUsed}/${quotaMax} Hóa đơn miễn phí`;
+    // Sync Quota Bar with PinService
+    if (window.PinService) {
+      PinService.syncUI();
+    }
   },
 
   // Render Data Grid Table
