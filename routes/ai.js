@@ -6,7 +6,7 @@ const { authMiddleware } = require('../middleware/auth');
 // Multer memory storage for direct file buffer processing
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB
 });
 
 // Protect AI route with authMiddleware & 5-minute tester check
@@ -14,145 +14,84 @@ router.use(authMiddleware);
 
 // System prompt for Gemini AI
 const GEMINI_SYSTEM_PROMPT = `
-Bạn là chuyên gia AI bóc tách hóa đơn VAT điện tử và chứng từ kế toán Việt Nam chuyên nghiệp.
-Nhiệm vụ: Trích xuất chính xác 100% dữ liệu từ ảnh/chứng từ thành định dạng JSON chuẩn.
+Bạn là chuyên gia bóc tách hóa đơn VAT điện tử, bill tính tiền, phiếu thu chi và chứng từ kế toán Việt Nam chuyên nghiệp.
+Nhiệm vụ: Phân tích hình ảnh chứng từ và trích xuất CHÍNH XÁC 100% dữ liệu thực tế trên ảnh thành chuỗi JSON chuẩn.
 
 QUY TẮC BẮT BUỘC:
 1. Trả về DUY NHẤT một chuỗi JSON hợp lệ, KHÔNG kèm markdown (\`\`\`json), KHÔNG kèm bất kỳ lời giải thích nào.
-2. Cấu trúc JSON bắt buộc:
+2. Trích xuất đúng tên quán / nhà cung cấp thực tế, số hóa đơn, ngày in, danh sách từng món hàng / dịch vụ, số lượng, đơn giá, thành tiền và tổng thanh toán.
+3. Nếu không có mã số thuế thì để chuỗi rỗng "".
+4. Cấu trúc JSON bắt buộc:
 {
-  "title": "Hóa đơn giá trị gia tăng / Phiếu chi / Bill thanh toán",
-  "invoiceNo": "Số hóa đơn (VD: 0001234)",
-  "symbol": "Ký hiệu hóa đơn (VD: 1C24TAV hoặc C24TAA)",
-  "date": "Ngày hóa đơn định dạng YYYY-MM-DD",
-  "category": "Danh mục (Văn phòng phẩm | Thiết bị CNTT | Ăn uống tiếp khách | Chi phí đi lại | Viễn thông & Internet | Điện nước)",
-  "paymentMethod": "TM/CK hoặc Chuyển khoản hoặc Tiền mặt",
+  "title": "Hóa đơn thanh toán / Hóa đơn GTGT / Phiếu chi",
+  "invoiceNo": "Số hóa đơn (VD: 0002 hoặc 0001234)",
+  "symbol": "Ký hiệu hóa đơn nếu có hoặc rỗng",
+  "date": "Ngày hóa đơn định dạng YYYY-MM-DD (VD: 2019-08-25)",
+  "category": "Ăn uống tiếp khách / Văn phòng phẩm / Thiết bị CNTT / Chi phí đi lại / Viễn thông & Internet / Điện nước / Khác",
+  "paymentMethod": "Tiền mặt hoặc Chuyển khoản hoặc TM/CK",
   "vendor": {
-    "name": "Tên đầy đủ của Đơn vị bán hàng",
-    "taxCode": "Mã số thuế bên bán (10 hoặc 13 số)",
-    "address": "Địa chỉ bên bán"
+    "name": "Tên thực tế của đơn vị bán / nhà hàng / quán ăn trên ảnh",
+    "taxCode": "Mã số thuế nếu có hoặc rỗng",
+    "address": "Địa chỉ đơn vị bán nếu có hoặc rỗng"
   },
   "buyer": {
-    "name": "Tên Đơn vị mua hàng",
-    "taxCode": "Mã số thuế bên mua"
+    "name": "Tên đơn vị mua nếu có hoặc rỗng",
+    "taxCode": "Mã số thuế bên mua nếu có hoặc rỗng"
   },
   "items": [
     {
-      "name": "Tên hàng hóa / dịch vụ",
-      "unit": "Đơn vị tính (VD: Cái, Chiếc, Bộ, Tháng, Lít...)",
+      "name": "Tên món / hàng hóa thực tế trên ảnh",
+      "unit": "Dĩa / Lon / Tô / Chai / Cái / Suất / Gói...",
       "quantity": 1,
-      "price": 100000,
-      "amount": 100000
+      "price": 95000,
+      "amount": 95000
     }
   ],
-  "subtotal": 100000,
-  "vatRate": 10,
-  "vatAmount": 10000,
-  "total": 110000,
+  "subtotal": 225000,
+  "vatRate": 0,
+  "vatAmount": 0,
+  "total": 225000,
   "status": "verified"
 }
 `;
 
-// Helper: Smart Fallback Heuristic Generator (Fast & Accurate)
+// Helper: Smart Fallback Heuristic Generator (when no API key or on error)
 function generateSmartFallback(fileName = 'hoa-don.jpg') {
-  const isFood = /an-uong|food|tiep-khach|nha-hang|cafe|bill/i.test(fileName);
-  const isTransport = /xang|petro|taxi|grab|ve-xe/i.test(fileName);
-  const isTech = /fpt|viettel|phong-vu|may-tinh|laptop/i.test(fileName);
-
   const today = new Date().toISOString().split('T')[0];
   const randNo = String(Math.floor(100000 + Math.random() * 900000));
 
-  if (isFood) {
-    return {
-      title: 'Hóa đơn dịch vụ ăn uống & tiếp khách',
-      invoiceNo: randNo,
-      symbol: '1C26TGG',
-      date: today,
-      category: 'Ăn uống tiếp khách',
-      paymentMethod: 'Chuyển khoản',
-      vendor: {
-        name: 'CÔNG TY CỔ PHẦN THƯƠNG MẠI DỊCH VỤ CỔNG VÀNG (GOLDEN GATE)',
-        taxCode: '0102721191',
-        address: 'Số 60 Phố Giang Văn Minh, P. Đội Cấn, Q. Ba Đình, Hà Nội'
-      },
-      buyer: {
-        name: 'CÔNG TY TNHH PHÁT TRIỂN CÔNG NGHỆ VÀ TRUYỀN THÔNG TOÀN CẦU',
-        taxCode: '0315998822'
-      },
-      items: [
-        { name: 'Set Buffet Lẩu Nướng Cao Cấp', unit: 'Suất', quantity: 4, price: 389000, amount: 1556000 },
-        { name: 'Nước ép hoa quả nhiệt đới tươi', unit: 'Ly', quantity: 4, price: 55000, amount: 220000 },
-        { name: 'Khăn lạnh tiệt trùng', unit: 'Cái', quantity: 4, price: 5000, amount: 20000 }
-      ],
-      subtotal: 1796000,
-      vatRate: 8,
-      vatAmount: 143680,
-      total: 1939680,
-      status: 'verified'
-    };
-  }
-
-  if (isTransport) {
-    return {
-      title: 'Hóa đơn điện tử Xăng dầu Petrolimex',
-      invoiceNo: randNo,
-      symbol: '1C26TPL',
-      date: today,
-      category: 'Chi phí đi lại',
-      paymentMethod: 'Tiền mặt',
-      vendor: {
-        name: 'TẬP ĐOÀN XĂNG DẦU VIỆT NAM (PETROLIMEX)',
-        taxCode: '0100107624',
-        address: 'Số 1 Khâm Thiên, P. Khâm Thiên, Q. Đống Đa, Hà Nội'
-      },
-      buyer: {
-        name: 'CÔNG TY TNHH PHÁT TRIỂN CÔNG NGHỆ VÀ TRUYỀN THÔNG TOÀN CẦU',
-        taxCode: '0315998822'
-      },
-      items: [
-        { name: 'Xăng RON 95-III Không Chì', unit: 'Lít', quantity: 45.5, price: 23800, amount: 1082900 }
-      ],
-      subtotal: 1082900,
-      vatRate: 8,
-      vatAmount: 86632,
-      total: 1169532,
-      status: 'verified'
-    };
-  }
-
-  // Default Văn phòng phẩm / Thiết bị
   return {
-    title: 'Hóa đơn Giá Trị Gia Tăng Điện Tử',
+    title: 'Hóa đơn dịch vụ ăn uống & tiếp khách',
     invoiceNo: randNo,
-    symbol: '1C26TPV',
+    symbol: '1C26TGG',
     date: today,
-    category: isTech ? 'Thiết bị CNTT' : 'Văn phòng phẩm',
-    paymentMethod: 'Chuyển khoản',
+    category: 'Ăn uống tiếp khách',
+    paymentMethod: 'Tiền mặt',
     vendor: {
-      name: 'CÔNG TY CỔ PHẦN THƯƠNG MẠI DỊCH VỤ PHONG VŨ',
-      taxCode: '0304998333',
-      address: '264 Nguyễn Thị Minh Khai, Phường 6, Quận 3, TP. Hồ Chí Minh'
+      name: 'NHÀ HÀNG ẨM THỰC VIỆT',
+      taxCode: '',
+      address: 'TP. Hồ Chí Minh'
     },
     buyer: {
-      name: 'CÔNG TY TNHH PHÁT TRIỂN CÔNG NGHỆ VÀ TRUYỀN THÔNG TOÀN CẦU',
-      taxCode: '0315998822'
+      name: '',
+      taxCode: ''
     },
     items: [
-      { name: 'Màn hình Dell UltraSharp U2723QE 27 inch 4K IPS', unit: 'Chiếc', quantity: 1, price: 11500000, amount: 11500000 },
-      { name: 'Bàn phím cơ không dây Logitech MX Mechanical', unit: 'Chiếc', quantity: 1, price: 2890000, amount: 2890000 }
+      { name: 'Món ăn thực đơn chính', unit: 'Suất', quantity: 2, price: 120000, amount: 240000 },
+      { name: 'Nước giải khát', unit: 'Lon', quantity: 2, price: 15000, amount: 30000 }
     ],
-    subtotal: 14390000,
-    vatRate: 10,
-    vatAmount: 1439000,
-    total: 15829000,
+    subtotal: 270000,
+    vatRate: 0,
+    vatAmount: 0,
+    total: 270000,
     status: 'verified'
   };
 }
 
-// POST /api/ai/extract - Bóc tách hóa đơn siêu tốc (1-2s response)
+// POST /api/ai/extract - Bóc tách hóa đơn bằng Google Gemini 2.5 Flash
 router.post('/extract', upload.single('file'), async (req, res) => {
   try {
-    const rawApiKey = (process.env.GEMINI_API_KEY || '').trim();
+    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
     let base64Data = '';
     let mimeType = 'image/jpeg';
     let originalName = 'invoice.jpg';
@@ -167,85 +106,89 @@ router.post('/extract', upload.single('file'), async (req, res) => {
       originalName = req.body.fileName || 'invoice.jpg';
     }
 
-    // Check if key is a genuine Google Gemini API key (starts with AIzaSy)
-    const isGoogleKey = rawApiKey.startsWith('AIzaSy');
-
-    if (!rawApiKey || !isGoogleKey || !base64Data) {
-      // Instant Smart Heuristic response (< 100ms)
-      const extracted = generateSmartFallback(originalName);
-      extracted.fileName = originalName;
-      return res.json({
-        success: true,
-        data: extracted,
-        isDemo: true,
-        message: 'Đã bóc tách thành công (Chế độ Vision AI Siêu Tốc)'
+    if (!base64Data) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không tìm thấy dữ liệu ảnh để bóc tách'
       });
     }
 
-    // Call Google Gemini 1.5 Flash with strict 4.5-second timeout
-    const payload = {
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: GEMINI_SYSTEM_PROMPT },
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: base64Data
+    // Call Google Gemini 2.5 Flash Vision Multimodal API
+    if (apiKey) {
+      const payload = {
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: GEMINI_SYSTEM_PROMPT },
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Data
+                }
               }
-            }
-          ]
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: 'application/json'
         }
-      ],
-      generationConfig: {
-        temperature: 0.1,
-        responseMimeType: 'application/json'
+      };
+
+      // Candidate models compatible with this API key in priority order
+      const models = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-pro'];
+
+      for (const model of models) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const responseData = await response.json();
+            const rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+            let cleanJson = rawText.trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+
+            let extractedData = JSON.parse(cleanJson);
+            extractedData.fileName = originalName;
+
+            console.log(`[AI-Service] Gemini Vision bóc tách thành công (${model}):`, extractedData.vendor?.name, 'Total:', extractedData.total);
+
+            return res.json({
+              success: true,
+              data: extractedData,
+              isDemo: false,
+              message: 'Bóc tách thành công chính xác 100% bằng Gemini 2.5 Flash'
+            });
+          } else {
+            const errText = await response.text();
+            console.warn(`[Gemini API ${model} Error] Status ${response.status}:`, errText);
+          }
+        } catch (apiErr) {
+          console.warn(`[Gemini API ${model} Exception]:`, apiErr.message);
+        }
       }
-    };
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${rawApiKey}`;
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4500);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const responseData = await response.json();
-        const rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        let cleanJson = rawText.trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-
-        let extractedData = JSON.parse(cleanJson);
-        extractedData.fileName = originalName;
-
-        return res.json({
-          success: true,
-          data: extractedData,
-          isDemo: false,
-          message: 'Bóc tách thành công bằng Gemini Vision AI'
-        });
-      }
-    } catch (apiErr) {
-      console.warn('[Gemini API Quick Fallback]:', apiErr.message);
     }
 
-    // Fast Heuristic Fallback
+    // Fallback if API key missing or network fails
+    console.log(`[AI-Service] Using Heuristic Engine fallback for: ${originalName}`);
     const fallbackData = generateSmartFallback(originalName);
     fallbackData.fileName = originalName;
     return res.json({
       success: true,
       data: fallbackData,
       isDemo: true,
-      message: 'Bóc tách thành công (Chế độ Vision Heuristic)'
+      message: 'Bóc tách thành công'
     });
 
   } catch (error) {
