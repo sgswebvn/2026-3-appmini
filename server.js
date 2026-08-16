@@ -17,27 +17,39 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Static files (frontend)
 app.use(express.static(__dirname));
 
-// API Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/invoices', require('./routes/invoices'));
-app.use('/api/ai', require('./routes/ai'));
+// Connect to MongoDB with caching (Optimized for both Local and Vercel Serverless)
+let cachedPromise = null;
+async function connectDB() {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    time: new Date().toISOString()
-  });
-});
+  if (!cachedPromise) {
+    console.log(`[Database] Đang kết nối tới MongoDB...`);
+    cachedPromise = mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+      bufferCommands: false // Disable buffering so queries don't hang if disconnected
+    }).then(async (conn) => {
+      console.log('[Database] Kết nối MongoDB thành công!');
+      await seedDefaultAdmin();
+      return conn;
+    }).catch((err) => {
+      cachedPromise = null;
+      console.error('[Database] Lỗi kết nối MongoDB:', err.message);
+      throw err;
+    });
+  }
 
-// Seed default Admin account
+  return cachedPromise;
+}
+
+// Seed default Admin account if not exists
 async function seedDefaultAdmin() {
   try {
     const adminUsername = (process.env.ADMIN_USERNAME || 'admin').trim().toLowerCase();
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
 
-    const existingAdmin = await User.findOne({ role: 'admin' });
+    const existingAdmin = await User.findOne({ username: adminUsername });
     if (!existingAdmin) {
       const admin = new User({
         username: adminUsername,
@@ -56,25 +68,32 @@ async function seedDefaultAdmin() {
   }
 }
 
-// Connect to MongoDB
-let isConnected = false;
-async function connectDB() {
-  if (isConnected) return;
+// Ensure Database is connected before handling any API requests
+app.use('/api', async (req, res, next) => {
   try {
-    console.log(`[Database] Đang kết nối tới MongoDB: ${MONGODB_URI}`);
-    await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000
-    });
-    isConnected = true;
-    console.log('[Database] Kết nối MongoDB thành công!');
-    await seedDefaultAdmin();
+    await connectDB();
+    next();
   } catch (err) {
-    console.warn('[Database] Cảnh báo kết nối MongoDB:', err.message);
-    console.log('[Database] Hệ thống sẽ thử kết nối lại hoặc bạn có thể cấu hình MONGODB_URI trong file .env');
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể kết nối đến cơ sở dữ liệu MongoDB. Vui lòng kiểm tra cấu hình MONGODB_URI trong .env hoặc cài đặt IP Whitelist (0.0.0.0/0) trong MongoDB Atlas: ' + err.message
+    });
   }
-}
+});
 
-connectDB();
+// API Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/invoices', require('./routes/invoices'));
+app.use('/api/ai', require('./routes/ai'));
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    time: new Date().toISOString()
+  });
+});
 
 // Fallback to index.html for SPA routes
 app.get('/', (req, res) => {
@@ -83,6 +102,9 @@ app.get('/', (req, res) => {
 
 // Start listening if running directly
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  // Pre-connect on startup
+  connectDB().catch(e => console.warn('[Database] Pre-connect warning:', e.message));
+
   app.listen(PORT, () => {
     console.log(`====================================================`);
     console.log(`🚀 BillFlow AI Server đang chạy tại http://localhost:${PORT}/`);

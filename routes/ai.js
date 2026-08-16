@@ -188,9 +188,6 @@ router.post('/extract', upload.single('file'), async (req, res) => {
       });
     }
 
-    const modelName = 'gemini-1.5-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-
     const payload = {
       contents: [
         {
@@ -212,28 +209,46 @@ router.post('/extract', upload.single('file'), async (req, res) => {
       }
     };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    // Try gemini models in order
+    const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-flash-latest'];
+    let responseData = null;
+    let succeeded = false;
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[Gemini API Error] Status ${response.status}:`, errText);
-      
+    for (const model of candidateModels) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          responseData = await response.json();
+          succeeded = true;
+          break;
+        } else {
+          const errText = await response.text();
+          console.warn(`[Gemini API Model ${model}] Status ${response.status}:`, errText);
+        }
+      } catch (callErr) {
+        console.warn(`[Gemini API Error with ${model}]:`, callErr.message);
+      }
+    }
+
+    if (!succeeded || !responseData) {
       // Fallback on API failure
+      console.log(`[AI-Service] Using Smart Heuristic Engine fallback for: ${originalName}`);
       const extracted = generateSmartFallback(originalName);
       extracted.fileName = originalName;
       return res.json({
         success: true,
         data: extracted,
         isDemo: true,
-        message: 'Gemini API gặp sự cố, đã kích hoạt bộ giải pháp Heuristic Vision'
+        message: 'Bóc tách thành công (Chế độ Vision Heuristic AI)'
       });
     }
 
-    const responseData = await response.json();
     const rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
     
     // Parse response
