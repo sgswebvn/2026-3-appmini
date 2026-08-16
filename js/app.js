@@ -29,7 +29,10 @@ const App = {
       const res = await AuthService.authFetch('/api/invoices');
       if (res.ok) {
         const data = await res.json();
-        this.invoices = data.invoices || [];
+        this.invoices = (data.invoices || []).map(inv => {
+          if (!inv.id && inv._id) inv.id = inv._id.toString();
+          return inv;
+        });
         this.refreshUI();
       }
     } catch (err) {
@@ -102,6 +105,12 @@ const App = {
 
         const saveData = await saveRes.json();
         const savedInvoice = saveData.invoice || extracted;
+        if (!savedInvoice.previewUrl && extracted.previewUrl) {
+          savedInvoice.previewUrl = extracted.previewUrl;
+        }
+        if (!savedInvoice.id && savedInvoice._id) {
+          savedInvoice.id = savedInvoice._id.toString();
+        }
 
         // Add to main invoices array at top
         this.invoices.unshift(savedInvoice);

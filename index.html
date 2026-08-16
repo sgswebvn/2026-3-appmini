@@ -213,22 +213,23 @@
           <!-- LEFT PANE: Document Image Viewport -->
           <div class="doc-viewport-pane" id="docViewportPane">
             <div class="doc-toolbar">
-              <button class="doc-tool-btn" onclick="UIController.zoomDoc(0.2)" title="Phóng to">
+              <button type="button" class="doc-tool-btn" onclick="UIController.zoomDoc(0.2)" title="Phóng to">
                 <i data-lucide="zoom-in" style="width: 14px; height: 14px;"></i>
               </button>
-              <button class="doc-tool-btn" onclick="UIController.zoomDoc(-0.2)" title="Thu nhỏ">
+              <button type="button" class="doc-tool-btn" onclick="UIController.zoomDoc(-0.2)" title="Thu nhỏ">
                 <i data-lucide="zoom-out" style="width: 14px; height: 14px;"></i>
               </button>
-              <button class="doc-tool-btn" onclick="UIController.rotateDoc()" title="Xoay 90 độ">
+              <span id="zoomPercentage" style="font-size: 0.75rem; font-family: var(--font-mono); color: var(--text-secondary); padding: 0 0.35rem;">100%</span>
+              <button type="button" class="doc-tool-btn" onclick="UIController.rotateDoc()" title="Xoay 90 độ">
                 <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
               </button>
-              <button class="doc-tool-btn" onclick="UIController.resetDocView()" title="Mặc định">
+              <button type="button" class="doc-tool-btn" onclick="UIController.resetDocView()" title="Mặc định">
                 <i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i>
               </button>
             </div>
 
-            <div class="doc-canvas-area" id="docCanvasArea">
-              <img id="docPreviewImage" src="" alt="Chứng từ gốc" style="display: none;">
+            <div class="doc-canvas-area" id="docCanvasArea" style="overflow: auto; display: flex; align-items: center; justify-content: center; position: relative; min-height: 380px;">
+              <img id="docPreviewImage" src="" alt="Chứng từ gốc" style="display: none; max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.15s ease-out; transform-origin: center center;">
               <div id="docPlaceholderMessage" style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">
                 <i data-lucide="image" style="width: 32px; height: 32px; margin-bottom: 0.5rem; color: #475569;"></i>
                 <p>Chưa có ảnh chứng từ gốc</p>
@@ -369,6 +370,8 @@
                 <label class="form-label">Hình thức thanh toán</label>
                 <input type="text" id="revPaymentMethod" class="form-input" placeholder="TM/CK, Chuyển khoản...">
               </div>
+
+              <div id="revMathAlert" class="math-validation-box valid" style="margin-top: 1rem;"></div>
 
             </form>
           </div>

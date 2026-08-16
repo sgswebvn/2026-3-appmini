@@ -235,47 +235,70 @@ const UIController = {
   // Open Split-Screen Reviewer
   openReviewer(invoice) {
     if (!invoice) return;
-    this.activeInvoiceId = invoice.id;
+    this.activeInvoiceId = invoice.id || invoice._id;
     this.zoomLevel = 1;
     this.rotationDegree = 0;
     this.panX = 0;
     this.panY = 0;
 
     const card = document.getElementById('reviewerCard');
-    card.classList.add('open');
-    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (card) {
+      card.classList.add('open');
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 
     // 1. Render Left Pane (Document Viewport)
-    const imgPreview = document.getElementById('docImagePreview');
-    imgPreview.src = invoice.previewUrl;
-    imgPreview.style.transform = `scale(1) rotate(0deg) translate(0px, 0px)`;
-    document.getElementById('zoomPercentage').innerText = '100%';
+    const imgPreview = document.getElementById('docPreviewImage');
+    const placeholder = document.getElementById('docPlaceholderMessage');
+    
+    if (invoice.previewUrl) {
+      if (imgPreview) {
+        imgPreview.src = invoice.previewUrl;
+        imgPreview.style.display = 'block';
+        imgPreview.style.transform = `scale(1) rotate(0deg) translate(0px, 0px)`;
+      }
+      if (placeholder) placeholder.style.display = 'none';
+    } else {
+      if (imgPreview) {
+        imgPreview.src = '';
+        imgPreview.style.display = 'none';
+      }
+      if (placeholder) placeholder.style.display = 'block';
+    }
+
+    const zoomEl = document.getElementById('zoomPercentage');
+    if (zoomEl) zoomEl.innerText = '100%';
 
     // 2. Render Right Pane (Form inputs)
-    document.getElementById('revTitle').value = invoice.title || '';
-    document.getElementById('revInvoiceNo').value = invoice.invoiceNo || '';
-    document.getElementById('revSymbol').value = invoice.symbol || '';
-    document.getElementById('revDate').value = invoice.date || '';
-    document.getElementById('revCategory').value = invoice.category || 'Chi phí quản lý chung';
-    document.getElementById('revPaymentMethod').value = invoice.paymentMethod || 'Chuyển khoản';
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = (val !== undefined && val !== null) ? val : '';
+    };
+
+    setVal('revTitle', invoice.title || 'Hóa đơn GTGT');
+    setVal('revInvoiceNo', invoice.invoiceNo || '');
+    setVal('revSymbol', invoice.symbol || '');
+    setVal('revDate', invoice.date || '');
+    setVal('revCategory', invoice.category || 'Văn phòng phẩm');
+    setVal('revPaymentMethod', invoice.paymentMethod || 'Chuyển khoản');
 
     // Vendor info
-    document.getElementById('revVendorName').value = invoice.vendor?.name || '';
-    document.getElementById('revVendorTaxCode').value = invoice.vendor?.taxCode || '';
-    document.getElementById('revVendorAddress').value = invoice.vendor?.address || '';
+    setVal('revVendorName', invoice.vendor?.name || '');
+    setVal('revVendorTaxCode', invoice.vendor?.taxCode || '');
+    setVal('revVendorAddress', invoice.vendor?.address || '');
 
     // Buyer info
-    document.getElementById('revBuyerName').value = invoice.buyer?.name || '';
-    document.getElementById('revBuyerTaxCode').value = invoice.buyer?.taxCode || '';
+    setVal('revBuyerName', invoice.buyer?.name || '');
+    setVal('revBuyerTaxCode', invoice.buyer?.taxCode || '');
 
     // Line items table
     this.renderReviewerItems(invoice.items || []);
 
     // Summary calculations
-    document.getElementById('revSubtotal').value = invoice.subtotal || 0;
-    document.getElementById('revVatRate').value = invoice.vatRate || 0;
-    document.getElementById('revVatAmount').value = invoice.vatAmount || 0;
-    document.getElementById('revTotal').value = invoice.total || 0;
+    setVal('revSubtotal', invoice.subtotal || 0);
+    setVal('revVatRate', invoice.vatRate !== undefined ? invoice.vatRate : 10);
+    setVal('revVatAmount', invoice.vatAmount || 0);
+    setVal('revTotal', invoice.total || 0);
 
     this.checkMathInReviewer();
     if (window.lucide) lucide.createIcons();
@@ -284,6 +307,7 @@ const UIController = {
   // Toggle Fullscreen Mode for Reviewer
   toggleReviewerFullscreen() {
     const card = document.getElementById('reviewerCard');
+    if (!card) return;
     const isFs = card.classList.toggle('fullscreen');
     const icon = document.getElementById('fsIcon');
     const text = document.getElementById('fsText');
@@ -303,8 +327,10 @@ const UIController = {
   // Close Reviewer
   closeReviewer() {
     const card = document.getElementById('reviewerCard');
-    card.classList.remove('open');
-    card.classList.remove('fullscreen');
+    if (card) {
+      card.classList.remove('open');
+      card.classList.remove('fullscreen');
+    }
     document.body.style.overflow = '';
     const text = document.getElementById('fsText');
     if (text) text.innerText = 'Mở rộng toàn màn hình';
@@ -338,7 +364,7 @@ const UIController = {
         <td><input type="number" class="item-price" style="text-align: right;" value="${item.price || 0}" step="1000" oninput="UIController.onItemChange()"></td>
         <td><input type="number" class="item-amount" style="text-align: right; font-weight: bold; color: var(--primary);" value="${item.amount || 0}" readonly></td>
         <td style="text-align: center;">
-          <button class="btn btn-secondary btn-sm" style="padding: 0.25rem; color: #ef4444;" onclick="UIController.removeLineItem(${index})" title="Xóa dòng">
+          <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem; color: #ef4444;" onclick="UIController.removeLineItem(${index})" title="Xóa dòng">
             <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
           </button>
         </td>
@@ -381,6 +407,7 @@ const UIController = {
   // Add new empty line item
   addLineItem() {
     const tbody = document.getElementById('revItemsTableBody');
+    if (!tbody) return;
     const index = tbody.querySelectorAll('tr').length;
     const tr = document.createElement('tr');
     tr.dataset.index = index;
@@ -392,7 +419,7 @@ const UIController = {
       <td><input type="number" class="item-price" style="text-align: right;" value="0" oninput="UIController.onItemChange()"></td>
       <td><input type="number" class="item-amount" style="text-align: right; font-weight: bold; color: var(--primary);" value="0" readonly></td>
       <td style="text-align: center;">
-        <button class="btn btn-secondary btn-sm" style="padding: 0.25rem; color: #ef4444;" onclick="this.closest('tr').remove(); UIController.onItemChange();">
+        <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem; color: #ef4444;" onclick="this.closest('tr').remove(); UIController.onItemChange();">
           <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
         </button>
       </td>
@@ -400,6 +427,10 @@ const UIController = {
     tbody.appendChild(tr);
     this.onItemChange();
     if (window.lucide) lucide.createIcons();
+  },
+
+  addReviewerItemRow() {
+    this.addLineItem();
   },
 
   removeLineItem(index) {
@@ -412,22 +443,29 @@ const UIController = {
 
   // Recalculate VAT Amount & Total
   recalculateTaxAndTotal() {
-    const subtotal = Number(document.getElementById('revSubtotal').value) || 0;
-    const vatRate = Number(document.getElementById('revVatRate').value) || 0;
+    const subtotal = Number(document.getElementById('revSubtotal')?.value) || 0;
+    const vatRate = Number(document.getElementById('revVatRate')?.value) || 0;
     const vatAmount = Math.round((subtotal * vatRate) / 100);
-    document.getElementById('revVatAmount').value = vatAmount;
-    document.getElementById('revTotal').value = subtotal + vatAmount;
+    const vatEl = document.getElementById('revVatAmount');
+    const totalEl = document.getElementById('revTotal');
+    if (vatEl) vatEl.value = vatAmount;
+    if (totalEl) totalEl.value = subtotal + vatAmount;
     this.checkMathInReviewer();
+  },
+
+  calcReviewerTotals() {
+    this.recalculateTaxAndTotal();
   },
 
   // Live Math Check Alert inside Reviewer
   checkMathInReviewer() {
-    const subtotal = Number(document.getElementById('revSubtotal').value) || 0;
-    const vatAmount = Number(document.getElementById('revVatAmount').value) || 0;
-    const total = Number(document.getElementById('revTotal').value) || 0;
-    const vatRate = Number(document.getElementById('revVatRate').value) || 0;
-
     const box = document.getElementById('revMathAlert');
+    if (!box) return;
+
+    const subtotal = Number(document.getElementById('revSubtotal')?.value) || 0;
+    const vatAmount = Number(document.getElementById('revVatAmount')?.value) || 0;
+    const total = Number(document.getElementById('revTotal')?.value) || 0;
+
     const expected = subtotal + vatAmount;
     const diff = Math.abs(expected - total);
 
@@ -435,19 +473,19 @@ const UIController = {
       box.className = 'math-validation-box valid';
       box.innerHTML = `
         <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <i data-lucide="shield-check" style="width: 18px; height: 18px;"></i>
+          <i data-lucide="shield-check" style="width: 18px; height: 18px; color: #10b981;"></i>
           <span>Số liệu khớp hoàn hảo: ${subtotal.toLocaleString('vi-VN')} + ${vatAmount.toLocaleString('vi-VN')} = ${total.toLocaleString('vi-VN')} đ</span>
         </div>
-        <span style="font-size: 0.7rem; background: rgba(16,185,129,0.2); padding: 0.2rem 0.5rem; border-radius: 4px;">Khớp 100%</span>
+        <span style="font-size: 0.7rem; background: rgba(16,185,129,0.2); color: #10b981; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 700;">Khớp 100%</span>
       `;
     } else {
       box.className = 'math-validation-box invalid';
       box.innerHTML = `
         <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <i data-lucide="alert-circle" style="width: 18px; height: 18px;"></i>
+          <i data-lucide="alert-circle" style="width: 18px; height: 18px; color: #ef4444;"></i>
           <span>Cảnh báo lệch số học: Tiền hàng + VAT (${expected.toLocaleString('vi-VN')} đ) khác Tổng tiền (${total.toLocaleString('vi-VN')} đ)</span>
         </div>
-        <span style="font-size: 0.7rem; background: rgba(239,68,68,0.2); padding: 0.2rem 0.5rem; border-radius: 4px;">Lệch ${diff.toLocaleString('vi-VN')} đ</span>
+        <span style="font-size: 0.7rem; background: rgba(239,68,68,0.2); color: #ef4444; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 700;">Lệch ${diff.toLocaleString('vi-VN')} đ</span>
       `;
     }
     if (window.lucide) lucide.createIcons();
@@ -472,11 +510,18 @@ const UIController = {
     this.applyDocTransform();
   },
 
+  resetDocView() {
+    this.resetDocTransform();
+  },
+
   applyDocTransform() {
-    const img = document.getElementById('docImagePreview');
+    const img = document.getElementById('docPreviewImage');
     if (img) {
       img.style.transform = `scale(${this.zoomLevel}) rotate(${this.rotationDegree}deg) translate(${this.panX}px, ${this.panY}px)`;
-      document.getElementById('zoomPercentage').innerText = `${Math.round(this.zoomLevel * 100)}%`;
+    }
+    const zoomEl = document.getElementById('zoomPercentage');
+    if (zoomEl) {
+      zoomEl.innerText = `${Math.round(this.zoomLevel * 100)}%`;
     }
   },
 
