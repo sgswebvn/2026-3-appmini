@@ -32,14 +32,14 @@
       
       <div class="brand-wrapper">
         <div class="brand-icon">
-          <i data-lucide="scan-text" style="width: 24px; height: 24px;"></i>
+          <i data-lucide="file-text" style="width: 20px; height: 20px;"></i>
         </div>
         <div class="brand-info">
           <h1>
-            BillFlow AI 
-            <span class="brand-badge">MongoDB Cloud</span>
+            BillFlow
+            <span class="brand-badge">Bản Kế Toán</span>
           </h1>
-          <p class="brand-subtitle">Hệ thống bóc tách hóa đơn VAT & chứng từ kế toán tự động</p>
+          <p class="brand-subtitle">Phần mềm bóc tách & quản lý hóa đơn, chứng từ tự động</p>
         </div>
       </div>
 
@@ -47,27 +47,27 @@
         
         <!-- Live 5-Minute Tester Countdown or Admin Badge -->
         <div id="userCountdownBadge" class="countdown-badge" style="display: none;">
-          <i data-lucide="timer" style="width: 14px; height: 14px; color: #f59e0b;"></i>
+          <i data-lucide="clock" style="width: 14px; height: 14px; color: #f59e0b;"></i>
           <span id="userCountdownText">Đang kiểm tra...</span>
         </div>
 
         <button class="btn btn-secondary btn-sm" onclick="App.openModal('analyticsModal')" title="Xem biểu đồ chi phí">
-          <i data-lucide="pie-chart" style="width: 15px; height: 15px; color: #a855f7;"></i> Phân tích chi phí
+          <i data-lucide="pie-chart" style="width: 14px; height: 14px;"></i> Phân tích chi phí
         </button>
 
         <button class="btn btn-secondary btn-sm" onclick="App.openModal('allItemsModal')" title="Xem tất cả dòng hàng">
-          <i data-lucide="boxes" style="width: 15px; height: 15px; color: #38bdf8;"></i> Bảng kê mặt hàng
+          <i data-lucide="list" style="width: 14px; height: 14px;"></i> Bảng kê mặt hàng
         </button>
 
         <!-- Admin Management Button (Visible only to Admin) -->
-        <button id="adminManageBtn" class="btn btn-primary btn-sm" style="display: none;" onclick="App.openAdminUsersModal()" title="Cấp và quản lý tài khoản test 5 phút">
-          <i data-lucide="users" style="width: 15px; height: 15px;"></i> Cấp tài khoản Test
+        <button id="adminManageBtn" class="btn btn-primary btn-sm" style="display: none;" onclick="App.openAdminUsersModal()" title="Cấp tài khoản test 5 phút">
+          <i data-lucide="users" style="width: 14px; height: 14px;"></i> Cấp tài khoản Test
         </button>
 
         <!-- User Profile & Logout Area -->
         <div id="authProfileArea" class="auth-header-wrapper" style="display: none;">
           <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 600;">
-            <i data-lucide="user-circle" style="width: 16px; height: 16px; color: var(--primary);"></i>
+            <i data-lucide="user" style="width: 15px; height: 15px; color: var(--primary);"></i>
             <span id="authUsernameText">User</span>
           </div>
           <button class="btn btn-secondary btn-sm btn-icon-only" onclick="AuthService.logout()" title="Đăng xuất">
@@ -83,65 +83,45 @@
   <!-- Main Container -->
   <main class="app-container">
 
-    <!-- Database & Account Status Ribbon -->
-    <section class="quota-banner">
-      <div class="quota-info">
-        <span class="quota-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3);">
-          <i data-lucide="database" style="width: 13px; height: 13px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> MongoDB Atlas / Cloud DB
-        </span>
-        <span style="font-size: 0.85rem; color: var(--text-secondary);">Dữ liệu hóa đơn được lưu trữ an toàn và đồng bộ thời gian thực theo tài khoản</span>
-      </div>
-      <div class="quota-bar-wrapper">
-        <span id="quotaText" style="font-size: 0.8rem; font-weight: 600; color: var(--text-main);">0 Chứng từ trong cơ sở dữ liệu MongoDB</span>
-        <div class="quota-progress">
-          <div id="quotaFill" class="quota-fill" style="width: 100%; background: linear-gradient(90deg, #10b981, #059669);"></div>
-        </div>
-      </div>
-    </section>
-
     <!-- Top Stats Ribbon -->
-    <section class="stats-ribbon">
-      <div class="stat-card">
+    <section class="stats-ribbon" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;">
+      <div class="stat-card" style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
         <div>
-          <div class="stat-label">Tổng số chứng từ</div>
-          <div id="statTotalCount" class="stat-value">0</div>
-          <div class="stat-subtext">Hóa đơn điện tử & Bill đã lưu</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Tổng số chứng từ</div>
+          <div id="statTotalCount" style="font-size: 1.35rem; font-weight: 700; color: #f8fafc; font-family: var(--font-mono); margin-top: 0.25rem;">0</div>
         </div>
-        <div class="stat-icon emerald">
-          <i data-lucide="receipt" style="width: 22px; height: 22px;"></i>
+        <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: rgba(16, 185, 129, 0.1); color: var(--primary); display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="file-check" style="width: 18px; height: 18px;"></i>
         </div>
       </div>
 
-      <div class="stat-card">
+      <div class="stat-card" style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
         <div>
-          <div class="stat-label">Tổng tiền chi phí (VND)</div>
-          <div id="statTotalSpending" class="stat-value">0 đ</div>
-          <div class="stat-subtext">Đã bao gồm thuế GTGT</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Tổng tiền thanh toán</div>
+          <div id="statTotalSpending" style="font-size: 1.35rem; font-weight: 700; color: #38bdf8; font-family: var(--font-mono); margin-top: 0.25rem;">0 đ</div>
         </div>
-        <div class="stat-icon blue">
-          <i data-lucide="wallet" style="width: 22px; height: 22px;"></i>
+        <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: rgba(56, 189, 248, 0.1); color: #38bdf8; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="dollar-sign" style="width: 18px; height: 18px;"></i>
         </div>
       </div>
 
-      <div class="stat-card">
+      <div class="stat-card" style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
         <div>
-          <div class="stat-label">Thuế VAT được khấu trừ</div>
-          <div id="statTotalVat" class="stat-value">0 đ</div>
-          <div class="stat-subtext">Kê khai thuế đầu vào</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Tiền thuế VAT</div>
+          <div id="statTotalVat" style="font-size: 1.35rem; font-weight: 700; color: #a855f7; font-family: var(--font-mono); margin-top: 0.25rem;">0 đ</div>
         </div>
-        <div class="stat-icon purple">
-          <i data-lucide="percent" style="width: 22px; height: 22px;"></i>
+        <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: rgba(168, 85, 247, 0.1); color: #a855f7; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="percent" style="width: 18px; height: 18px;"></i>
         </div>
       </div>
 
-      <div class="stat-card">
+      <div class="stat-card" style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
         <div>
-          <div class="stat-label">Cảnh báo sai lệch số học</div>
-          <div id="statWarningCount" class="stat-value">0</div>
-          <div class="stat-subtext" style="color: var(--warning);">Cần rà soát lại</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Lệch số học / Cần sửa</div>
+          <div id="statWarningCount" style="font-size: 1.35rem; font-weight: 700; color: #f59e0b; font-family: var(--font-mono); margin-top: 0.25rem;">0</div>
         </div>
-        <div class="stat-icon amber">
-          <i data-lucide="shield-alert" style="width: 22px; height: 22px;"></i>
+        <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: rgba(245, 158, 11, 0.1); color: #f59e0b; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="alert-triangle" style="width: 18px; height: 18px;"></i>
         </div>
       </div>
     </section>
@@ -155,16 +135,16 @@
         
         <div class="dropzone-area" id="dropzoneArea">
           <div class="dropzone-icon-circle">
-            <i data-lucide="cloud-upload" style="width: 28px; height: 28px;"></i>
+            <i data-lucide="upload" style="width: 22px; height: 22px;"></i>
           </div>
-          <h2 class="dropzone-title">Kéo & thả ảnh hóa đơn VAT, PDF hoặc bill thanh toán vào đây</h2>
+          <h2 class="dropzone-title">Kéo & thả ảnh hóa đơn VAT, phiếu chi hoặc bill thanh toán vào đây</h2>
           <p class="dropzone-subtitle">
-            Hỗ trợ hóa đơn GTGT điện tử, ảnh chụp chứng từ, vé xe, bill thanh toán, ủy nhiệm chi ngân hàng... Xử lý tự động bằng Gemini Vision AI (backend .env).
+            Hỗ trợ hóa đơn GTGT điện tử, ảnh chụp chứng từ, phiếu chi, vé xe... Tự động phân tích và trích xuất dữ liệu sang Excel.
           </p>
 
           <div class="dropzone-actions">
             <button class="btn btn-primary" type="button">
-              <i data-lucide="upload" style="width: 16px; height: 16px;"></i> Chọn file từ máy tính
+              <i data-lucide="folder-open" style="width: 15px; height: 15px;"></i> Chọn file từ máy tính
             </button>
           </div>
         </div>
@@ -173,8 +153,8 @@
         <div class="file-queue-section" id="fileQueueSection" style="display: none;">
           <div class="queue-header">
             <div class="queue-title">
-              <i data-lucide="layers" style="width: 16px; height: 16px; color: var(--primary);"></i>
-              Tiến trình xử lý hàng loạt
+              <i data-lucide="layers" style="width: 15px; height: 15px; color: var(--primary);"></i>
+              Tiến trình bóc tách
             </div>
             <span id="queueCountBadge" style="font-size: 0.75rem; color: var(--text-muted);">0 chứng từ</span>
           </div>
@@ -186,24 +166,24 @@
       <section class="reviewer-card" id="reviewerCard">
         <div class="reviewer-header">
           <div class="reviewer-title">
-            <div style="width: 32px; height: 32px; border-radius: var(--radius-sm); background: rgba(16, 185, 129, 0.2); display: flex; align-items: center; justify-content: center; color: var(--primary);">
-              <i data-lucide="split" style="width: 18px; height: 18px;"></i>
+            <div style="width: 28px; height: 28px; border-radius: var(--radius-xs); background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; color: var(--primary);">
+              <i data-lucide="edit-3" style="width: 15px; height: 15px;"></i>
             </div>
             <div>
-              <h3 id="reviewerTitle" style="font-size: 1rem; font-weight: 700;">Trình đối soát chứng từ Split-Screen</h3>
-              <p style="font-size: 0.75rem; color: var(--text-muted);">Kiểm tra hình ảnh gốc và chỉnh sửa dữ liệu số trước khi xuất file</p>
+              <h3 id="reviewerTitle" style="font-size: 0.95rem; font-weight: 700;">Đối soát & Chỉnh sửa chứng từ</h3>
+              <p style="font-size: 0.75rem; color: var(--text-muted);">Kiểm tra hình ảnh gốc và chỉnh sửa thông tin chi tiết</p>
             </div>
           </div>
 
-          <div class="reviewer-controls">
-            <button class="btn btn-secondary btn-sm" onclick="App.rescanCurrentInvoice()" title="Quét lại bằng AI Vision">
-              <i data-lucide="scan" style="width: 14px; height: 14px; color: #38bdf8;"></i> Quét lại AI
+          <div class="reviewer-controls" style="display: flex; align-items: center; gap: 0.5rem;">
+            <button class="btn btn-secondary btn-sm" onclick="App.rescanCurrentInvoice()" title="Đọc lại toàn bộ ảnh chứng từ">
+              <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Đọc lại ảnh
             </button>
             <button class="btn btn-primary btn-sm" onclick="App.saveReviewerChanges()">
-              <i data-lucide="save" style="width: 14px; height: 14px;"></i> Lưu thay đổi (Ctrl+S)
+              <i data-lucide="check" style="width: 14px; height: 14px;"></i> Lưu thay đổi
             </button>
             <button class="btn btn-secondary btn-sm btn-icon-only" onclick="UIController.closeReviewer()" title="Đóng bảng">
-              <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+              <i data-lucide="x" style="width: 14px; height: 14px;"></i>
             </button>
           </div>
         </div>
@@ -480,13 +460,13 @@
   <!-- 1. Login Modal -->
   <div class="modal-backdrop" id="loginModal">
     <div class="modal-container login-card-container">
-      <div style="text-align: center; margin-bottom: 1.5rem;">
-        <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); display: inline-flex; align-items: center; justify-content: center; color: var(--primary); margin-bottom: 0.75rem;">
-          <i data-lucide="lock" style="width: 26px; height: 26px;"></i>
+      <div style="text-align: center; margin-bottom: 1.25rem;">
+        <div style="width: 44px; height: 44px; border-radius: var(--radius-md); background: rgba(16, 185, 129, 0.12); display: inline-flex; align-items: center; justify-content: center; color: var(--primary); margin-bottom: 0.5rem;">
+          <i data-lucide="lock" style="width: 22px; height: 22px;"></i>
         </div>
-        <h2 style="font-size: 1.3rem; font-weight: 800;">Đăng Nhập BillFlow AI</h2>
-        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
-          Hệ thống bóc tách hóa đơn & chứng từ kế toán tự động
+        <h2 style="font-size: 1.15rem; font-weight: 700;">Đăng Nhập BillFlow</h2>
+        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem;">
+          Hệ thống bóc tách & quản lý hóa đơn, chứng từ
         </p>
       </div>
 

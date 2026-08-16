@@ -359,12 +359,12 @@ const UIController = {
       <tr data-index="${index}">
         <td style="text-align: center; color: var(--text-muted); font-size: 0.75rem; font-family: var(--font-mono);">${index + 1}</td>
         <td><input type="text" class="item-name" value="${item.name || ''}" placeholder="Tên hàng hóa, dịch vụ..." oninput="UIController.onItemChange()"></td>
-        <td><input type="text" class="item-unit" style="text-align: center;" value="${item.unit || 'Cái'}" placeholder="ĐVT" oninput="UIController.onItemChange()"></td>
-        <td><input type="number" class="item-qty" style="text-align: right;" value="${item.quantity || 1}" min="0.01" step="any" oninput="UIController.onItemChange()"></td>
-        <td><input type="number" class="item-price" style="text-align: right;" value="${item.price || 0}" step="1000" oninput="UIController.onItemChange()"></td>
-        <td><input type="number" class="item-amount" style="text-align: right; font-weight: bold; color: var(--primary);" value="${item.amount || 0}" readonly></td>
-        <td style="text-align: center;">
-          <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem; color: #ef4444;" onclick="UIController.removeLineItem(${index})" title="Xóa dòng">
+        <td style="width: 70px;"><input type="text" class="item-unit" style="text-align: center;" value="${item.unit || 'Cái'}" placeholder="ĐVT" oninput="UIController.onItemChange()"></td>
+        <td style="width: 70px;"><input type="number" class="item-qty" style="text-align: right;" value="${item.quantity || 1}" min="0.01" step="any" oninput="UIController.onItemChange()"></td>
+        <td style="width: 110px;"><input type="number" class="item-price" style="text-align: right;" value="${item.price || 0}" step="1000" oninput="UIController.onItemChange()"></td>
+        <td style="width: 120px;"><input type="number" class="item-amount" style="text-align: right;" value="${item.amount || 0}" readonly></td>
+        <td style="text-align: center; width: 34px;">
+          <button type="button" class="btn btn-secondary btn-sm btn-icon-only" style="color: #ef4444;" onclick="UIController.removeLineItem(${index})" title="Xóa dòng">
             <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
           </button>
         </td>
@@ -414,12 +414,12 @@ const UIController = {
     tr.innerHTML = `
       <td style="text-align: center; color: var(--text-muted); font-size: 0.75rem; font-family: var(--font-mono);">${index + 1}</td>
       <td><input type="text" class="item-name" value="" placeholder="Tên hàng hóa mới..." oninput="UIController.onItemChange()"></td>
-      <td><input type="text" class="item-unit" style="text-align: center;" value="Cái" oninput="UIController.onItemChange()"></td>
-      <td><input type="number" class="item-qty" style="text-align: right;" value="1" oninput="UIController.onItemChange()"></td>
-      <td><input type="number" class="item-price" style="text-align: right;" value="0" oninput="UIController.onItemChange()"></td>
-      <td><input type="number" class="item-amount" style="text-align: right; font-weight: bold; color: var(--primary);" value="0" readonly></td>
-      <td style="text-align: center;">
-        <button type="button" class="btn btn-secondary btn-sm" style="padding: 0.25rem; color: #ef4444;" onclick="this.closest('tr').remove(); UIController.onItemChange();">
+      <td style="width: 70px;"><input type="text" class="item-unit" style="text-align: center;" value="Cái" oninput="UIController.onItemChange()"></td>
+      <td style="width: 70px;"><input type="number" class="item-qty" style="text-align: right;" value="1" oninput="UIController.onItemChange()"></td>
+      <td style="width: 110px;"><input type="number" class="item-price" style="text-align: right;" value="0" oninput="UIController.onItemChange()"></td>
+      <td style="width: 120px;"><input type="number" class="item-amount" style="text-align: right;" value="0" readonly></td>
+      <td style="text-align: center; width: 34px;">
+        <button type="button" class="btn btn-secondary btn-sm btn-icon-only" style="color: #ef4444;" onclick="this.closest('tr').remove(); UIController.onItemChange();" title="Xóa dòng">
           <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
         </button>
       </td>
