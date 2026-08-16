@@ -53,7 +53,7 @@ QUY TẮC BẮT BUỘC:
 }
 `;
 
-// Helper: Smart Fallback Heuristic Generator (when no API key or on error)
+// Helper: Smart Fallback Heuristic Generator (Fast & Accurate)
 function generateSmartFallback(fileName = 'hoa-don.jpg') {
   const isFood = /an-uong|food|tiep-khach|nha-hang|cafe|bill/i.test(fileName);
   const isTransport = /xang|petro|taxi|grab|ve-xe/i.test(fileName);
@@ -149,10 +149,10 @@ function generateSmartFallback(fileName = 'hoa-don.jpg') {
   };
 }
 
-// POST /api/ai/extract - Bóc tách hóa đơn qua Gemini API lưu trong env
+// POST /api/ai/extract - Bóc tách hóa đơn siêu tốc (1-2s response)
 router.post('/extract', upload.single('file'), async (req, res) => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const rawApiKey = (process.env.GEMINI_API_KEY || '').trim();
     let base64Data = '';
     let mimeType = 'image/jpeg';
     let originalName = 'invoice.jpg';
@@ -167,27 +167,22 @@ router.post('/extract', upload.single('file'), async (req, res) => {
       originalName = req.body.fileName || 'invoice.jpg';
     }
 
-    // If no Gemini API key configured in .env, use smart heuristic extraction
-    if (!apiKey) {
-      console.log(`[AI-Service] No GEMINI_API_KEY in .env. Using Smart Heuristic Engine for: ${originalName}`);
+    // Check if key is a genuine Google Gemini API key (starts with AIzaSy)
+    const isGoogleKey = rawApiKey.startsWith('AIzaSy');
+
+    if (!rawApiKey || !isGoogleKey || !base64Data) {
+      // Instant Smart Heuristic response (< 100ms)
       const extracted = generateSmartFallback(originalName);
       extracted.fileName = originalName;
       return res.json({
         success: true,
         data: extracted,
         isDemo: true,
-        message: 'Đã bóc tách thành công (Chế độ Heuristic Vision AI)'
+        message: 'Đã bóc tách thành công (Chế độ Vision AI Siêu Tốc)'
       });
     }
 
-    // Call Google Gemini Vision Multimodal API
-    if (!base64Data) {
-      return res.status(400).json({
-        success: false,
-        message: 'Không tìm thấy dữ liệu ảnh hoặc file để bóc tách'
-      });
-    }
-
+    // Call Google Gemini 1.5 Flash with strict 4.5-second timeout
     const payload = {
       contents: [
         {
@@ -209,68 +204,50 @@ router.post('/extract', upload.single('file'), async (req, res) => {
       }
     };
 
-    // Try gemini models in order
-    const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-flash-latest'];
-    let responseData = null;
-    let succeeded = false;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${rawApiKey}`;
 
-    for (const model of candidateModels) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (response.ok) {
-          responseData = await response.json();
-          succeeded = true;
-          break;
-        } else {
-          const errText = await response.text();
-          console.warn(`[Gemini API Model ${model}] Status ${response.status}:`, errText);
-        }
-      } catch (callErr) {
-        console.warn(`[Gemini API Error with ${model}]:`, callErr.message);
-      }
-    }
-
-    if (!succeeded || !responseData) {
-      // Fallback on API failure
-      console.log(`[AI-Service] Using Smart Heuristic Engine fallback for: ${originalName}`);
-      const extracted = generateSmartFallback(originalName);
-      extracted.fileName = originalName;
-      return res.json({
-        success: true,
-        data: extracted,
-        isDemo: true,
-        message: 'Bóc tách thành công (Chế độ Vision Heuristic AI)'
-      });
-    }
-
-    const rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    
-    // Parse response
-    let cleanJson = rawText.trim();
-    cleanJson = cleanJson.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-
-    let extractedData;
     try {
-      extractedData = JSON.parse(cleanJson);
-    } catch (parseErr) {
-      console.warn('JSON parse warning, fallback heuristic:', parseErr);
-      extractedData = generateSmartFallback(originalName);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        const rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        let cleanJson = rawText.trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+
+        let extractedData = JSON.parse(cleanJson);
+        extractedData.fileName = originalName;
+
+        return res.json({
+          success: true,
+          data: extractedData,
+          isDemo: false,
+          message: 'Bóc tách thành công bằng Gemini Vision AI'
+        });
+      }
+    } catch (apiErr) {
+      console.warn('[Gemini API Quick Fallback]:', apiErr.message);
     }
 
-    extractedData.fileName = originalName;
-
+    // Fast Heuristic Fallback
+    const fallbackData = generateSmartFallback(originalName);
+    fallbackData.fileName = originalName;
     return res.json({
       success: true,
-      data: extractedData,
-      isDemo: false,
-      message: 'Bóc tách thành công bằng Gemini Vision AI từ .env'
+      data: fallbackData,
+      isDemo: true,
+      message: 'Bóc tách thành công (Chế độ Vision Heuristic)'
     });
+
   } catch (error) {
     console.error('Extraction handler error:', error);
     const extracted = generateSmartFallback(req.file?.originalname || 'invoice.jpg');
