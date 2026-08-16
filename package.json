@@ -1,0 +1,20 @@
+{
+  "name": "billflow-ai",
+  "version": "1.0.0",
+  "description": "BillFlow AI - Trình bóc tách hóa đơn & chứng từ thông minh sang Excel / Google Sheets",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "echo 'Static build ready'"
+  },
+  "keywords": [
+    "invoice-parser",
+    "ai-vision",
+    "gemini-ai",
+    "excel-export",
+    "vietnam-vat-invoice"
+  ],
+  "author": "BillFlow AI",
+  "license": "MIT"
+}
