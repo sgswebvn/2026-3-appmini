@@ -94,11 +94,15 @@ const UIController = {
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="9" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+          <td colspan="11" style="text-align: center; padding: 3.5rem 1rem; color: var(--text-muted);">
             <div style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
-              <i data-lucide="inbox" style="width: 42px; height: 42px; color: #475569;"></i>
-              <p style="font-size: 0.95rem; font-weight: 600;">Chưa có hóa đơn nào phù hợp bộ lọc</p>
-              <p style="font-size: 0.8rem;">Hãy tải ảnh hóa đơn lên hoặc nhấn "Tải dữ liệu mẫu" để trải nghiệm ngay.</p>
+              <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(16, 185, 129, 0.1); display: flex; align-items: center; justify-content: center; color: var(--primary);">
+                <i data-lucide="inbox" style="width: 28px; height: 28px;"></i>
+              </div>
+              <p style="font-size: 1.05rem; font-weight: 700; color: #f8fafc;">Chưa có chứng từ nào trong cơ sở dữ liệu</p>
+              <p style="font-size: 0.85rem; color: var(--text-secondary); max-width: 480px;">
+                Kéo thả ảnh hóa đơn VAT, bill thanh toán hoặc phiếu chi vào khung bên trên để AI tự động bóc tách sang Excel trong 2 giây.
+              </p>
             </div>
           </td>
         </tr>
@@ -117,7 +121,7 @@ const UIController = {
       // Nested sub-rows for all products
       const itemsSubTable = (inv.items && inv.items.length > 0) ? `
         <tr id="expand_row_${inv.id}" style="display: none; background: rgba(15, 23, 42, 0.95);">
-          <td colspan="9" style="padding: 1rem 1.5rem; border-left: 3px solid var(--primary);">
+          <td colspan="11" style="padding: 1rem 1.5rem; border-left: 3px solid var(--primary);">
             <div style="font-size: 0.8rem; font-weight: 700; color: var(--primary); margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
               <span><i data-lucide="package" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> Chi tiết ${itemsCount} mặt hàng trong hóa đơn #${inv.invoiceNo || '---'}:</span>
               <button class="btn btn-secondary btn-sm" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="App.openReviewer('${inv.id}')">
@@ -157,23 +161,27 @@ const UIController = {
           <td style="text-align: center;">
             <input type="checkbox" class="row-checkbox" value="${inv.id}">
           </td>
-          <td style="font-family: var(--font-mono); font-weight: 600; color: var(--text-secondary);">${idx + 1}</td>
           <td>
             <div style="font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 0.4rem;">
               <span>${inv.invoiceNo || '---'}</span>
+              ${itemsCount > 0 ? `
               <button class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.4rem; font-size: 0.7rem; border-radius: 4px;" onclick="UIController.toggleRowExpand('${inv.id}')" title="Bấm để xem nhanh tất cả sản phẩm">
                 <i data-lucide="chevron-down" id="chevron_${inv.id}" style="width: 12px; height: 12px; transition: transform 0.2s;"></i> ${itemsCount} món
-              </button>
+              </button>` : ''}
             </div>
-            <div style="font-size: 0.75rem; color: var(--text-muted);">${inv.symbol || 'Mẫu chuẩn'} | ${inv.date || '---'}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">${inv.symbol || '1C26TAV'}</div>
           </td>
+          <td style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-secondary);">${inv.date || '---'}</td>
           <td style="max-width: 260px;">
-            <div style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${inv.vendor?.name || ''}">
+            <div style="font-weight: 600; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${inv.vendor?.name || ''}">
               ${inv.vendor?.name || 'Chưa nhận diện'}
             </div>
-            <div style="font-size: 0.75rem; font-family: var(--font-mono); color: var(--primary);">
-              MST: ${inv.vendor?.taxCode || '---'}
+            <div style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${inv.vendor?.address || ''}
             </div>
+          </td>
+          <td style="font-family: var(--font-mono); color: var(--primary); font-weight: 600; font-size: 0.85rem;">
+            ${inv.vendor?.taxCode || '---'}
           </td>
           <td>
             <span class="category-pill ${categoryClass}">${inv.category || 'Quản lý chung'}</span>
@@ -185,16 +193,22 @@ const UIController = {
             ${ExtractorValidator.formatCurrency(inv.vatAmount)}
             <span style="font-size: 0.7rem; color: var(--text-muted);">(${inv.vatRate || 0}%)</span>
           </td>
-          <td style="text-align: right; font-family: var(--font-mono); font-weight: 800; color: var(--primary);">
+          <td style="text-align: right; font-family: var(--font-mono); font-weight: 800; color: var(--primary); font-size: 0.95rem;">
             ${ExtractorValidator.formatCurrency(inv.total)}
           </td>
-          <td>
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <td style="text-align: center;">
+            <span class="status-badge ${isVerified ? 'verified' : 'warning'}">
+              <i data-lucide="${isVerified ? 'check-circle' : 'alert-triangle'}" style="width: 12px; height: 12px;"></i>
+              ${isVerified ? 'Hợp lệ' : 'Cần rà soát'}
+            </span>
+          </td>
+          <td style="text-align: right;">
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem;">
               <button class="btn btn-primary btn-sm" onclick="App.openReviewer('${inv.id}')" title="So sánh & Chỉnh sửa chi tiết">
-                <i data-lucide="eye" style="width: 14px; height: 14px;"></i> Xem & Sửa
+                <i data-lucide="eye" style="width: 13px; height: 13px;"></i> Xem & Sửa
               </button>
               <button class="btn btn-secondary btn-sm" style="color: #ef4444; padding: 0.35rem;" onclick="App.deleteInvoice('${inv.id}')" title="Xóa">
-                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
               </button>
             </div>
           </td>

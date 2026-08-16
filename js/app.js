@@ -362,6 +362,45 @@ const App = {
       });
   },
 
+  // ================= AUTH LOGIN SUBMIT =================
+  async handleLoginSubmit(e) {
+    if (e) e.preventDefault();
+    const u = document.getElementById('loginUsername')?.value.trim();
+    const p = document.getElementById('loginPassword')?.value.trim();
+    const errEl = document.getElementById('loginErrorMsg');
+    const submitBtn = document.getElementById('loginSubmitBtn');
+
+    if (!u || !p) {
+      if (errEl) {
+        errEl.innerText = 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu!';
+        errEl.style.display = 'block';
+      }
+      return;
+    }
+
+    if (errEl) errEl.style.display = 'none';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<i data-lucide="loader-2" class="spin" style="width: 18px; height: 18px;"></i> Đang xác thực...`;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+      await AuthService.login(u, p);
+    } catch (err) {
+      if (errEl) {
+        errEl.innerText = err.message || 'Tên đăng nhập hoặc mật khẩu không chính xác';
+        errEl.style.display = 'block';
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i data-lucide="log-in" style="width: 18px; height: 18px;"></i> Đăng Nhập Hệ Thống`;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+  },
+
   // ================= ADMIN USER MANAGEMENT =================
   async openAdminUsersModal() {
     if (!AuthService.isAdmin()) {
