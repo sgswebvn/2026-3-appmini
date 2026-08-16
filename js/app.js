@@ -1,6 +1,6 @@
 /**
  * BILLFLOW AI - MAIN APPLICATION CONTROLLER
- * Orchestrates State, Batch Queue, Event Listeners & Local Storage Persistence
+ * Fullstack MongoDB Edition: Real-time Invoices, JWT Auth, 5-Minute Tester Auto-Lock
  */
 
 const App = {
@@ -8,73 +8,34 @@ const App = {
   selectedIds: new Set(),
 
   // Initialize App
-  init() {
-    if (window.PinService) {
-      PinService.init();
-    }
-    this.loadState();
+  async init() {
     this.bindEvents();
     
-    // If no invoices exist in storage, load sample invoices for instant WOW effect
-    if (this.invoices.length === 0) {
-      this.loadSampleData(false);
+    // Check and initialize Auth
+    const isAuth = await AuthService.init();
+    if (isAuth) {
+      await this.loadInvoicesFromDB();
     } else {
       this.refreshUI();
     }
 
-    // Set Gemini Key input if exists
-    const savedKey = AIService.getApiKey();
-    const keyInput = document.getElementById('apiKeyInput');
-    if (keyInput && savedKey) keyInput.value = savedKey;
-    this.updateAiStatusIndicator();
-
-    if (window.PinService) {
-      PinService.syncUI();
-    }
-
     if (window.lucide) lucide.createIcons();
-    console.log('BillFlow AI initialized successfully.');
+    console.log('BillFlow AI MongoDB Engine initialized.');
   },
 
-  // Save to LocalStorage
-  saveState() {
+  // Load Invoices from MongoDB via Backend API
+  async loadInvoicesFromDB() {
     try {
-      // Store metadata (exclude oversized preview strings if needed)
-      localStorage.setItem('billflow_invoices_data', JSON.stringify(this.invoices));
-    } catch (e) {
-      console.warn('Storage quota warning, keeping active session in memory');
-    }
-  },
-
-  // Load from LocalStorage
-  loadState() {
-    const raw = localStorage.getItem('billflow_invoices_data');
-    if (raw) {
-      try {
-        this.invoices = JSON.parse(raw);
-      } catch (e) {
-        this.invoices = [];
+      const res = await AuthService.authFetch('/api/invoices');
+      if (res.ok) {
+        const data = await res.json();
+        this.invoices = data.invoices || [];
+        this.refreshUI();
       }
-    }
-  },
-
-  // Load Sample Invoices
-  loadSampleData(notify = true) {
-    if (notify && window.PinService && !PinService.canPerformTest()) {
-      PinService.openPinModal('🔒 <strong>Bạn đã dùng hết 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để nạp thêm dữ liệu mẫu.');
-      return;
-    }
-
-    const samples = SampleDataService.getSamples();
-    this.invoices = [...samples];
-    this.saveState();
-    this.refreshUI();
-    
-    if (notify) {
-      if (window.PinService) {
-        PinService.consumeTrial(1);
-      }
-      UIController.showToast('Đã nạp 4 hóa đơn mẫu thực tế thành công!', 'success');
+    } catch (err) {
+      console.warn('Load invoices warning:', err.message);
+      this.invoices = [];
+      this.refreshUI();
     }
   },
 
@@ -92,8 +53,8 @@ const App = {
   async processFiles(files) {
     if (!files || files.length === 0) return;
 
-    if (window.PinService && !PinService.canPerformTest()) {
-      PinService.openPinModal(`🔒 <strong>Bạn đã dùng hết 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để bóc tách ${files.length} hóa đơn.`);
+    if (!AuthService.isLoggedIn()) {
+      AuthService.showLoginModal();
       return;
     }
 
@@ -104,11 +65,6 @@ const App = {
     UIController.showToast(`Bắt đầu xử lý hàng loạt ${files.length} hóa đơn...`, 'info');
 
     for (let i = 0; i < files.length; i++) {
-      if (window.PinService && !PinService.canPerformTest()) {
-        PinService.openPinModal('🔒 <strong>Đã đạt giới hạn 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để tiếp tục xử lý các hóa đơn còn lại.');
-        break;
-      }
-
       const file = files[i];
       const tempId = 'temp_' + Date.now() + '_' + i;
 
@@ -132,20 +88,23 @@ const App = {
       if (window.lucide) lucide.createIcons();
 
       try {
+        // Extract invoice data via Backend Gemini API (.env)
         const extracted = await AIService.extractInvoiceFromImage(file, progress => {
           const badge = card.querySelector('.queue-status-badge');
           if (badge) badge.innerText = progress.message;
         });
 
+        // Save to MongoDB
+        const saveRes = await AuthService.authFetch('/api/invoices', {
+          method: 'POST',
+          body: JSON.stringify(extracted)
+        });
+
+        const saveData = await saveRes.json();
+        const savedInvoice = saveData.invoice || extracted;
+
         // Add to main invoices array at top
-        this.invoices.unshift(extracted);
-        this.saveState();
-
-        // Consume 1 trial test
-        if (window.PinService) {
-          PinService.consumeTrial(1);
-        }
-
+        this.invoices.unshift(savedInvoice);
         this.refreshUI();
 
         // Update queue item card to Done
@@ -153,16 +112,16 @@ const App = {
         const badge = card.querySelector('.queue-status-badge');
         if (badge) {
           badge.className = 'queue-status-badge status-done';
-          badge.innerHTML = `<i data-lucide="check" style="width: 10px; height: 10px;"></i> Bóc tách xong`;
+          badge.innerHTML = `<i data-lucide="check" style="width: 10px; height: 10px;"></i> Đã lưu vào DB`;
         }
 
-        UIController.showToast(`Bóc tách thành công HĐ #${extracted.invoiceNo || 'mới'}`, 'success');
+        UIController.showToast(`Bóc tách & Lưu MongoDB thành công HĐ #${savedInvoice.invoiceNo || 'mới'}`, 'success');
       } catch (err) {
         console.error('Error processing file:', err);
         const badge = card.querySelector('.queue-status-badge');
         if (badge) {
           badge.className = 'queue-status-badge status-warning';
-          badge.innerText = 'Lỗi xử lý';
+          badge.innerText = err.message || 'Lỗi xử lý';
         }
       }
     }
@@ -180,18 +139,18 @@ const App = {
 
   // Open Reviewer for an invoice
   openReviewer(id) {
-    const inv = this.invoices.find(item => item.id === id);
+    const inv = this.invoices.find(item => item.id === id || item._id === id);
     if (inv) {
       UIController.openReviewer(inv);
     }
   },
 
-  // Save changes from Reviewer Pane
-  saveReviewerChanges() {
+  // Save changes from Reviewer Pane to MongoDB
+  async saveReviewerChanges() {
     const id = UIController.activeInvoiceId;
     if (!id) return;
 
-    const invIndex = this.invoices.findIndex(item => item.id === id);
+    const invIndex = this.invoices.findIndex(item => item.id === id || item._id === id);
     if (invIndex === -1) return;
 
     // Collect updated line items
@@ -215,8 +174,7 @@ const App = {
     const vatAmount = Number(document.getElementById('revVatAmount').value) || 0;
     const total = Number(document.getElementById('revTotal').value) || 0;
 
-    this.invoices[invIndex] = {
-      ...this.invoices[invIndex],
+    const updatePayload = {
       title: document.getElementById('revTitle').value,
       invoiceNo: document.getElementById('revInvoiceNo').value,
       symbol: document.getElementById('revSymbol').value,
@@ -240,36 +198,111 @@ const App = {
       status: 'verified'
     };
 
-    this.saveState();
-    this.refreshUI();
-    UIController.showToast('Đã lưu và cập nhật hóa đơn thành công!', 'success');
+    try {
+      const res = await AuthService.authFetch(`/api/invoices/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatePayload)
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      this.invoices[invIndex] = { ...this.invoices[invIndex], ...updatePayload };
+      this.refreshUI();
+      UIController.showToast('Đã lưu và cập nhật hóa đơn vào MongoDB thành công!', 'success');
+    } catch (err) {
+      UIController.showToast('Lỗi lưu hóa đơn: ' + err.message, 'error');
+    }
   },
 
-  // Delete invoice
-  deleteInvoice(id) {
-    if (confirm('Bạn có chắc chắn muốn xóa hóa đơn này khỏi danh sách?')) {
-      this.invoices = this.invoices.filter(i => i.id !== id);
-      if (UIController.activeInvoiceId === id) {
-        UIController.closeReviewer();
+  // Delete invoice from MongoDB
+  async deleteInvoice(id) {
+    if (confirm('Bạn có chắc chắn muốn xóa hóa đơn này khỏi cơ sở dữ liệu MongoDB?')) {
+      try {
+        const res = await AuthService.authFetch(`/api/invoices/${id}`, {
+          method: 'DELETE'
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.message);
+        }
+
+        this.invoices = this.invoices.filter(i => (i.id !== id && i._id !== id));
+        if (UIController.activeInvoiceId === id) {
+          UIController.closeReviewer();
+        }
+        this.refreshUI();
+        UIController.showToast('Đã xóa hóa đơn khỏi MongoDB', 'info');
+      } catch (err) {
+        UIController.showToast('Lỗi khi xóa: ' + err.message, 'error');
       }
-      this.saveState();
-      this.refreshUI();
-      UIController.showToast('Đã xóa hóa đơn', 'info');
     }
   },
 
-  // Clear all
-  clearAllInvoices() {
-    if (confirm('Xóa toàn bộ danh sách hóa đơn hiện tại?')) {
-      this.invoices = [];
-      this.saveState();
-      this.refreshUI();
-      UIController.closeReviewer();
-      UIController.showToast('Đã dọn dẹp danh sách', 'info');
+  // Clear all invoices from MongoDB
+  async clearAllInvoices() {
+    if (confirm('Xóa toàn bộ danh sách hóa đơn của bạn trong MongoDB?')) {
+      try {
+        const res = await AuthService.authFetch('/api/invoices', {
+          method: 'DELETE'
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.message);
+        }
+
+        this.invoices = [];
+        this.refreshUI();
+        UIController.closeReviewer();
+        UIController.showToast('Đã dọn dẹp sạch toàn bộ hóa đơn', 'info');
+      } catch (err) {
+        UIController.showToast('Lỗi dọn dẹp: ' + err.message, 'error');
+      }
     }
   },
 
-  // Export handlers
+  // Rescan active invoice in reviewer
+  async rescanCurrentInvoice() {
+    const id = UIController.activeInvoiceId;
+    if (!id) return;
+
+    const invIndex = this.invoices.findIndex(item => item.id === id || item._id === id);
+    if (invIndex === -1) return;
+
+    const currentInv = this.invoices[invIndex];
+    if (!currentInv.previewUrl) {
+      UIController.showToast('Không tìm thấy ảnh chứng từ gốc để quét lại', 'error');
+      return;
+    }
+
+    UIController.showToast('Gemini Vision AI đang đọc lại toàn bộ ảnh chứng từ...', 'info');
+
+    try {
+      const extracted = await AIService.extractInvoiceFromImage(currentInv.previewUrl, progress => {
+        UIController.showToast(progress.message, 'info', 1500);
+      });
+
+      extracted.id = currentInv.id || currentInv._id;
+      extracted.previewUrl = currentInv.previewUrl;
+      extracted.fileName = currentInv.fileName;
+
+      // Update in MongoDB
+      await AuthService.authFetch(`/api/invoices/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(extracted)
+      });
+
+      this.invoices[invIndex] = extracted;
+      this.refreshUI();
+      UIController.openReviewer(extracted);
+
+      UIController.showToast('Đã quét lại và cập nhật MongoDB thành công!', 'success');
+    } catch (err) {
+      UIController.showToast('Lỗi khi quét: ' + err.message, 'error');
+    }
+  },
+
+  // ================= EXPORT HANDLERS =================
   exportMisa() {
     if (this.invoices.length === 0) {
       UIController.showToast('Chưa có hóa đơn nào để xuất file!', 'error');
@@ -329,6 +362,139 @@ const App = {
       });
   },
 
+  // ================= ADMIN USER MANAGEMENT =================
+  async openAdminUsersModal() {
+    if (!AuthService.isAdmin()) {
+      UIController.showToast('Chỉ Quản trị viên (Admin) mới có quyền truy cập chức năng này!', 'error');
+      return;
+    }
+
+    this.openModal('adminUsersModal');
+    await this.refreshAdminUsersList();
+  },
+
+  async refreshAdminUsersList() {
+    const tbody = document.getElementById('adminUsersTableBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem;"><i data-lucide="loader-2" class="spin" style="width: 20px; height: 20px;"></i> Đang tải dữ liệu người dùng...</td></tr>`;
+    if (window.lucide) lucide.createIcons();
+
+    try {
+      const users = await AuthService.getAdminUsers();
+      if (users.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">Chưa có tài khoản test nào được cấp. Hãy nhấn "Cấp tài khoản mới" ở trên.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = users.map((u, idx) => {
+        let statusBadge = '';
+        if (u.isLocked) {
+          statusBadge = '<span class="badge-status-locked">Đã Khóa</span>';
+        } else if (u.status === 'expired') {
+          statusBadge = '<span class="badge-status-expired">Hết hạn (5p)</span>';
+        } else if (u.status === 'pending') {
+          statusBadge = '<span class="badge-status-pending">Chưa đăng nhập</span>';
+        } else {
+          statusBadge = '<span class="badge-status-active">Đang hoạt động</span>';
+        }
+
+        const remSec = u.remainingSeconds || 0;
+        const timeText = u.status === 'pending' ? `${u.durationMinutes} phút (chờ kích hoạt)` :
+          remSec > 0 ? `${AuthService.formatTimer(remSec)}` : '00:00';
+
+        return `
+          <tr>
+            <td style="text-align: center; font-weight: 600;">${idx + 1}</td>
+            <td style="font-weight: 700; color: var(--text-main); font-family: 'JetBrains Mono', monospace;">${u.username}</td>
+            <td>${u.durationMinutes} phút</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: ${remSec > 0 ? '#38bdf8' : '#ef4444'}; font-weight: 600;">${timeText}</td>
+            <td>${statusBadge}</td>
+            <td style="font-size: 0.8rem; color: var(--text-muted);">${u.note || '---'}</td>
+            <td style="text-align: right;">
+              <div style="display: flex; justify-content: flex-end; gap: 0.35rem;">
+                <button class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.72rem;" onclick="App.handleExtendUser('${u.id}', 5)" title="Cộng thêm 5 phút">
+                  <i data-lucide="plus-circle" style="width: 12px; height: 12px; color: #10b981;"></i> +5p
+                </button>
+                <button class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.72rem;" onclick="App.handleToggleLock('${u.id}', ${!u.isLocked})" title="${u.isLocked ? 'Mở khóa' : 'Khóa tài khoản'}">
+                  <i data-lucide="${u.isLocked ? 'unlock' : 'lock'}" style="width: 12px; height: 12px; color: ${u.isLocked ? '#38bdf8' : '#f59e0b'};"></i>
+                </button>
+                <button class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.72rem;" onclick="App.handleDeleteUser('${u.id}', '${u.username}')" title="Xóa tài khoản">
+                  <i data-lucide="trash-2" style="width: 12px; height: 12px; color: #ef4444;"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      if (window.lucide) lucide.createIcons();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 1.5rem;">Lỗi tải dữ liệu: ${err.message}</td></tr>`;
+    }
+  },
+
+  async handleCreateTester(e) {
+    e.preventDefault();
+    const userEl = document.getElementById('newTesterUsername');
+    const passEl = document.getElementById('newTesterPassword');
+    const durationEl = document.getElementById('newTesterDuration');
+    const noteEl = document.getElementById('newTesterNote');
+
+    const username = userEl?.value.trim();
+    const password = passEl?.value.trim();
+    const duration = parseInt(durationEl?.value, 10) || 5;
+    const note = noteEl?.value.trim() || '';
+
+    if (!username || !password) {
+      UIController.showToast('Vui lòng nhập tên đăng nhập và mật khẩu!', 'error');
+      return;
+    }
+
+    try {
+      const res = await AuthService.createTesterAccount(username, password, duration, note);
+      UIController.showToast(res.message, 'success');
+      if (userEl) userEl.value = '';
+      if (passEl) passEl.value = '';
+      if (noteEl) noteEl.value = '';
+      await this.refreshAdminUsersList();
+    } catch (err) {
+      UIController.showToast('Lỗi tạo tài khoản: ' + err.message, 'error');
+    }
+  },
+
+  async handleToggleLock(userId, lockStatus) {
+    try {
+      const res = await AuthService.toggleUserLock(userId, lockStatus);
+      UIController.showToast(lockStatus ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản', 'info');
+      await this.refreshAdminUsersList();
+    } catch (err) {
+      UIController.showToast('Lỗi: ' + err.message, 'error');
+    }
+  },
+
+  async handleExtendUser(userId, minutes = 5) {
+    try {
+      const res = await AuthService.extendUserTime(userId, minutes);
+      UIController.showToast(`Đã cộng thêm ${minutes} phút thành công!`, 'success');
+      await this.refreshAdminUsersList();
+    } catch (err) {
+      UIController.showToast('Lỗi gia hạn: ' + err.message, 'error');
+    }
+  },
+
+  async handleDeleteUser(userId, username) {
+    if (confirm(`Bạn có chắc chắn muốn xóa tài khoản test "${username}"?`)) {
+      try {
+        const res = await AuthService.deleteUser(userId);
+        UIController.showToast(res.message, 'info');
+        await this.refreshAdminUsersList();
+      } catch (err) {
+        UIController.showToast('Lỗi xóa tài khoản: ' + err.message, 'error');
+      }
+    }
+  },
+
   // Bind all UI event listeners
   bindEvents() {
     const dropzone = document.getElementById('dropzoneArea');
@@ -336,9 +502,9 @@ const App = {
 
     // Drag & Drop
     if (dropzone && fileInput) {
-      dropzone.addEventListener('click', (e) => {
-        if (window.PinService && !PinService.canPerformTest()) {
-          PinService.openPinModal('🔒 <strong>Bạn đã dùng hết 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để chọn file bóc tách.');
+      dropzone.addEventListener('click', () => {
+        if (!AuthService.isLoggedIn()) {
+          AuthService.showLoginModal();
           return;
         }
         fileInput.click();
@@ -356,8 +522,8 @@ const App = {
       dropzone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropzone.classList.remove('dragover');
-        if (window.PinService && !PinService.canPerformTest()) {
-          PinService.openPinModal('🔒 <strong>Bạn đã dùng hết 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để bóc tách hóa đơn.');
+        if (!AuthService.isLoggedIn()) {
+          AuthService.showLoginModal();
           return;
         }
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -402,7 +568,7 @@ const App = {
         UIController.closeReviewer();
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        if (document.getElementById('reviewerCard').classList.contains('open')) {
+        if (document.getElementById('reviewerCard')?.classList.contains('open')) {
           e.preventDefault();
           this.saveReviewerChanges();
         }
@@ -455,97 +621,6 @@ const App = {
 
   closeAllModals() {
     document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.remove('active'));
-  },
-
-  // Rescan active invoice in reviewer
-  async rescanCurrentInvoice() {
-    if (window.PinService && !PinService.canPerformTest()) {
-      PinService.openPinModal('🔒 <strong>Bạn đã dùng hết 2 lượt test miễn phí!</strong> Vui lòng nhập mã PIN để quét lại chứng từ.');
-      return;
-    }
-
-    const id = UIController.activeInvoiceId;
-    if (!id) return;
-
-    const invIndex = this.invoices.findIndex(item => item.id === id);
-    if (invIndex === -1) return;
-
-    const currentInv = this.invoices[invIndex];
-    if (!currentInv.previewUrl) {
-      UIController.showToast('Không tìm thấy ảnh chứng từ gốc để quét lại', 'error');
-      return;
-    }
-
-    const apiKey = AIService.getApiKey();
-    if (!apiKey) {
-      this.openModal('apiSettingsModal');
-      UIController.showToast('Vui lòng nhập Google Gemini API Key để quét ảnh thực tế!', 'info');
-      return;
-    }
-
-    UIController.showToast('Gemini Vision AI đang đọc lại toàn bộ ảnh chứng từ...', 'info');
-
-    try {
-      const extracted = await AIService.extractInvoiceFromImage(currentInv.previewUrl, progress => {
-        UIController.showToast(progress.message, 'info', 1500);
-      });
-
-      // Keep current ID and preview
-      extracted.id = currentInv.id;
-      extracted.previewUrl = currentInv.previewUrl;
-      extracted.fileName = currentInv.fileName;
-
-      if (window.PinService) {
-        PinService.consumeTrial(1);
-      }
-
-      this.invoices[invIndex] = extracted;
-      this.saveState();
-      this.refreshUI();
-      UIController.openReviewer(extracted);
-
-      UIController.showToast('Đã quét lại thành công với độ chính xác cao!', 'success');
-    } catch (err) {
-      UIController.showToast('Lỗi khi quét: ' + err.message, 'error');
-    }
-  },
-
-  updateAiStatusIndicator() {
-    const apiKey = AIService.getApiKey();
-    const pill = document.getElementById('aiStatusPill');
-    const text = document.getElementById('aiStatusText');
-    const dot = pill?.querySelector('.status-dot');
-
-    if (pill && text && dot) {
-      if (apiKey) {
-        dot.style.background = '#10b981';
-        text.innerText = 'Gemini AI Đang Bật';
-        pill.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-        pill.title = 'AI Vision thực tế đang hoạt động';
-      } else {
-        dot.style.background = '#f59e0b';
-        text.innerText = 'Chưa nhập API Key';
-        pill.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-        pill.title = 'Nhấn để nhập Google Gemini API Key';
-      }
-    }
-  },
-
-  // Save API Key
-  saveGeminiApiKey() {
-    const val = document.getElementById('apiKeyInput').value;
-    AIService.setApiKey(val);
-    this.updateAiStatusIndicator();
-    this.closeModal('apiSettingsModal');
-    if (val) {
-      UIController.showToast('Đã lưu Gemini API Key! Giờ bạn có thể bóc tách ảnh thật bằng Multimodal AI.', 'success');
-      // If reviewer is open, ask if user wants to rescan
-      if (UIController.activeInvoiceId) {
-        this.rescanCurrentInvoice();
-      }
-    } else {
-      UIController.showToast('Đã xóa API Key.', 'info');
-    }
   }
 };
 

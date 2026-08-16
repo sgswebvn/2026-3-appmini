@@ -66,10 +66,11 @@ const UIController = {
     document.getElementById('statTotalVat').innerText = ExtractorValidator.formatCurrency(totalVat);
     document.getElementById('statWarningCount').innerText = warningCount;
 
-    // Sync Quota Bar with PinService
-    if (window.PinService) {
-      PinService.syncUI();
-    }
+    // Update Database Storage Indicator
+    const quotaFill = document.getElementById('quotaFill');
+    const quotaText = document.getElementById('quotaText');
+    if (quotaFill) quotaFill.style.width = '100%';
+    if (quotaText) quotaText.innerText = `${totalCount} Chứng từ trong cơ sở dữ liệu MongoDB`;
   },
 
   // Render Data Grid Table

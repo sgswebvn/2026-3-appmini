@@ -1,39 +1,94 @@
-const http = require('http');
-const fs = require('fs');
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
 const path = require('path');
+const User = require('./models/User');
 
-const PORT = 8080;
-const MIME_TYPES = {
-  '.html': 'text/html',
-  '.css': 'text/css',
-  '.js': 'text/javascript',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml'
-};
+const app = express();
+const PORT = process.env.PORT || 8080;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/billflow';
 
-const server = http.createServer((req, res) => {
-  let filePath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url.split('?')[0]);
-  const ext = path.extname(filePath).toLowerCase();
-  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+// Middlewares
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-  fs.readFile(filePath, (err, content) => {
-    if (err) {
-      if (err.code === 'ENOENT') {
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('404 Not Found');
-      } else {
-        res.writeHead(500);
-        res.end('500 Server Error: ' + err.code);
-      }
-    } else {
-      res.writeHead(200, { 'Content-Type': contentType + '; charset=utf-8' });
-      res.end(content);
-    }
+// Static files (frontend)
+app.use(express.static(__dirname));
+
+// API Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/invoices', require('./routes/invoices'));
+app.use('/api/ai', require('./routes/ai'));
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    time: new Date().toISOString()
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}/`);
+// Seed default Admin account
+async function seedDefaultAdmin() {
+  try {
+    const adminUsername = (process.env.ADMIN_USERNAME || 'admin').trim().toLowerCase();
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+
+    const existingAdmin = await User.findOne({ role: 'admin' });
+    if (!existingAdmin) {
+      const admin = new User({
+        username: adminUsername,
+        password: adminPassword,
+        role: 'admin',
+        durationMinutes: 999999,
+        note: 'Tài khoản Quản trị viên tối cao (System Admin)'
+      });
+      await admin.save();
+      console.log(`[Database] Đã tạo tài khoản Admin mặc định: username="${adminUsername}" | password="${adminPassword}"`);
+    } else {
+      console.log(`[Database] Tài khoản Admin đã sẵn sàng: username="${existingAdmin.username}"`);
+    }
+  } catch (err) {
+    console.error('[Database] Lỗi khi tạo admin mặc định:', err.message);
+  }
+}
+
+// Connect to MongoDB
+let isConnected = false;
+async function connectDB() {
+  if (isConnected) return;
+  try {
+    console.log(`[Database] Đang kết nối tới MongoDB: ${MONGODB_URI}`);
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000
+    });
+    isConnected = true;
+    console.log('[Database] Kết nối MongoDB thành công!');
+    await seedDefaultAdmin();
+  } catch (err) {
+    console.warn('[Database] Cảnh báo kết nối MongoDB:', err.message);
+    console.log('[Database] Hệ thống sẽ thử kết nối lại hoặc bạn có thể cấu hình MONGODB_URI trong file .env');
+  }
+}
+
+connectDB();
+
+// Fallback to index.html for SPA routes
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
+
+// Start listening if running directly
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(`🚀 BillFlow AI Server đang chạy tại http://localhost:${PORT}/`);
+    console.log(`👤 Tài khoản Admin mặc định: admin / admin123`);
+    console.log(`====================================================`);
+  });
+}
+
+module.exports = app;
